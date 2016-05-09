@@ -1,0 +1,13 @@
+<span>
+  <div class="pull-left">
+    <span ng-show="port.direction == 'Provides'" class="glyphicon glyphicon-triangle-left"></span>
+  </div>
+  <div class="pull-right">
+    <span ng-show="port.idl.type == 'RFInfo'" class="glyphicon glyphicon-list-alt"><!-- Frontend RFInfo --></span>
+    <span ng-show="port.idl.type.endsWith('Tuner')" class="glyphicon glyphicon-signal"><!-- Frontend *Tuner --></span>
+    <span ng-show="port.idl.type == 'GPS'" class="glyphicon glyphicon-screenshot"><!-- Frontend GPS --></span>
+    <span ng-show="port.idl.type == 'BulkIO'" class="glyphicon glyphicon-log-in"><!-- BulkIO --></span>
+    <span ng-show="port.direction == 'Uses'" class="glyphicon glyphicon-triangle-right"></span>
+  </div>
+  {{port.name}}
+</span>

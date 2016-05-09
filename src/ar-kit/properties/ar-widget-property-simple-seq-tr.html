@@ -1,0 +1,12 @@
+
+<tr>
+  <td ar-widget-property-name-td item="rhProperty"></td>
+  <td><button type="button" class="btn btn-link" ng-click="isCollapsed = !isCollapsed">Show</button></td>
+</tr>
+
+<!-- Re-use simple -->
+<ar-widget-property-simple-tr uib-collapse="isCollapsed"
+  ng-repeat="item in rhProperty.value track by $index" 
+  item="item"
+  allow-edit="(_allowEdit && rhProperty.canEdit)">
+</ar-widget-property-simple-tr>

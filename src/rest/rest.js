@@ -28,12 +28,12 @@ angular.module('redhawk.rest')
       this.domain = $resource(Config.domainsUrl, {}, {
         query:        {method: 'GET', cache:false},
         info:         {method: 'GET', url: Config.domainUrl, cache:false},
+        configure:    {method: 'PUT', url: Config.domainUrl + '/properties'}
       });
 
-      /* Retaining for future upcoming feature 
       this.fileSystem = $resource(Config.domainUrl + '/fs/:path', {}, {
         query:        {method: 'GET', cache:false}
-      }); */
+      });
 
       this.deviceManager = $resource(Config.deviceManagerUrl, {}, {
         query:        {method: 'GET', cache:false}

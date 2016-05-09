@@ -1,0 +1,17 @@
+<div class="row" ng-hide="ports.length == 0">
+  <!-- Port list panel -->
+  <div ng-hide="ports.length==1" class="col-lg-1 col-md-2 col-sm-2 col-xs-2">
+    <h4>Ports</h4>
+    <ar-list-ports ports="ports" selected="selectedPort" ng-init="selectedPort={}">
+  </div>
+
+  <!-- Selected port(s) detail view -->
+  <div ng-class="{'col-lg-11 col-md-10 col-sm-10 col-xs-10' : ports.length > 1, 'col-md-12' : ports.length == 1">
+  </div>
+</div>
+
+<div class="row" ng-show="ports.length == 0">
+  <div class="col-md-12">
+    No ports
+  </div>
+</div>

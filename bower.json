@@ -26,16 +26,18 @@
     "url": "https://github.com/geontech/angular-redhawk.git"
   },
   "dependencies": {
+    "protobuf": "~3.8.2",
     "jQuery": "~2.1.1",
     "bootstrap-css": "",
     "angular": ">=1.5.5",
+    "angular-animate": "",
     "angular-bootstrap": "",
-    "angular-recursion": "",
+    "angular-recursion": "~1.0.1",
     "angular-route": "",
     "angular-resource": "",
     "angular-toastr": "0.5.2",
-    "angular-animate": "",
-    "protobuf": "~3.8.2"
+    "angular-ui-router": "",
+    "angular-touch": ""
   },
   "ignore": [
     "**/.*",

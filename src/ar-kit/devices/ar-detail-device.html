@@ -1,0 +1,14 @@
+<!-- Detail view of a device manager -->
+<div class="row" ng-hide="null == device">
+  <div class="col-md-12">
+    <h2>{{ device.name }}</h2>
+
+    <h3>Properties</h3>
+    <ar-widget-properties 
+      item="device.properties">
+    </ar-widget-properties>
+
+    <h3>Ports</h3>
+    <!-- Make a list+detail panel design -->
+  </div>
+</div>

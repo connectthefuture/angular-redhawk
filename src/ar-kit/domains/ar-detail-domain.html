@@ -1,0 +1,34 @@
+<!-- Detail view of a domain -->
+<div class="row">
+  <div class="col-md-12">
+    <h2>{{ domain.name }}</h2>
+
+    <p ng-show="selected">Use the menu (above) to navigate the domain.</p>
+    <p ng-show="!selected" class="text-info"><button type="button" class="btn btn-link" ng-click="setAsSelectedDomain()">Select this domain</button></p>
+
+    <h3>Properties</h3>
+    <ar-widget-properties 
+      item="domain.properties" 
+      form-callback="domain.configure">
+    </ar-widget-properties>
+
+    <h3>Filesystem</h3>
+    Some other info
+    <!-- TODO: List folders, properties -->
+
+    <h3>Event Channels</h3>
+    An event channel viewer panel
+    <!-- TODO: 
+            Button to expand a well containing the most recent X messages
+            Field for setting the value of X
+
+      -->
+
+    <!-- TODO: Application, device manager, and allocations listing if not selected. -->
+    <div ng-show="!selected">
+      <h3>Applications</h3>
+      <h3>Device Managers</h3>
+      <h3>Allocations</h3>
+    </div>
+  </div>
+</div>

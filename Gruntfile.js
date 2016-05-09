@@ -60,26 +60,20 @@ module.exports = function(grunt) {
           'angular-route/angular-route.js'         : 'angular-route/angular-route.js',
           'angular-resource/angular-resource.js'   : 'angular-resource/angular-resource.js',
           'angular-toastr/dist/angular-toastr.js'  : 'angular-toastr/dist/angular-toastr.js',
+          'angular-touch/angular-touch.js'         : 'angular-touch/angular-touch.js',
+          'angular-ui-router/release/angular-ui-router.js'  : 'angular-ui-router/release/angular-ui-router.js',
 
           'bootstrap-css/css/bootstrap.css'        : 'bootstrap-css/css/bootstrap.css',
           'angular-toastr/dist/angular-toastr.css' : 'angular-toastr/dist/angular-toastr.css'
         }
       },
       bootstrap_map: {
-        options: {
-          destPrefix: distDir
-        },
-        files: {
-          'bootstrap.css.map' : 'bootstrap-css/css/bootstrap.css.map'
-        }
+        options: { destPrefix: distDir },
+        files:   { 'bootstrap.css.map' : 'bootstrap-css/css/bootstrap.css.map' }
       },
       bootstrap_fonts: {
-        options: {
-          destPrefix: 'fonts'
-        },
-        files: {
-          '' : 'bootstrap-css/fonts/*'
-        }
+        options: { destPrefix: 'fonts' },
+        files:   { '' : 'bootstrap-css/fonts/*' }
       }
     },
     bower: {
@@ -95,6 +89,26 @@ module.exports = function(grunt) {
     // Clean the dist directory and the generated templates file.
     clean: [distDir, 'fonts', '<%= ngtemplates.directives.dest %>'],
 
+    // Copy images to the dist folder.
+    copy: {
+      images : {
+        files: [
+          {
+            expand  : true,
+            cwd     : 'images',
+            dest    : distDir + '/images',
+            src     : [ '*.{png,svg,jpg}' ]
+          },
+          {
+            expand  : true,
+            cwd     : 'src',
+            dest    : distDir,
+            src     : [ '**/*.{png,svg,jpg}' ]
+          }
+        ]
+      }
+    },
+
     // Reusable directives and templates
     ngtemplates: {
       directives: {
@@ -104,6 +118,15 @@ module.exports = function(grunt) {
         options: {
           concat: 'dist',
           module: 'redhawk.directives'
+        }
+      },
+      arKit: {
+        cwd: 'src',
+        src: 'ar-kit/**/*.html',
+        dest: 'scripts/ar-kit-templates.js',
+        options: {
+          concat: 'dist',
+          module: 'redhawk.ar-kit'
         }
       }
     },
@@ -116,11 +139,18 @@ module.exports = function(grunt) {
       },
       dist: {
         src: [
-          'src/**/def.js',  // Ensure module definitions appear first.
+          'src/def.js',     // Ensure top module definitions appears first.
+          'src/**/def.js',  // Then other top modules
           'src/**/*.js', 
           'lib/**/*.js'
         ],
         dest: distDir + '/<%= pkg.name %>.js',
+      },
+      distCss: {
+        src: [
+          'src/**/*.css'
+        ],
+        dest: distDir + '/<%= pkg.name %>.css',
       },
       vendorJs: {
         src: [
@@ -135,7 +165,9 @@ module.exports = function(grunt) {
           'scripts/vendor/angular-recursion/angular-recursion.js', 
           'scripts/vendor/angular-route/angular-route.js',
           'scripts/vendor/angular-resource/angular-resource.js', 
-          'scripts/vendor/angular-toastr/dist/angular-toastr.js'
+          'scripts/vendor/angular-toastr/dist/angular-toastr.js',
+          'scripts/vendor/angular-touch/angular-touch.js',
+          'scripts/vendor/angular-ui-router/release/angular-ui-router.js'
         ],
         dest: distDir + '/vendor.js'
       },
@@ -163,11 +195,12 @@ module.exports = function(grunt) {
   });
 
   grunt.loadNpmTasks('grunt-contrib-clean');
+  grunt.loadNpmTasks('grunt-contrib-copy');
   grunt.loadNpmTasks('grunt-contrib-concat');
   grunt.loadNpmTasks('grunt-contrib-uglify');
   grunt.loadNpmTasks('grunt-bowercopy');
   grunt.loadNpmTasks('grunt-bower-task');
   grunt.loadNpmTasks('grunt-angular-templates');
 
-  grunt.registerTask('default', ['clean', 'bower', 'ngtemplates', 'bowercopy', 'concat', 'uglify']);
+  grunt.registerTask('default', ['clean', 'copy', 'bower', 'ngtemplates', 'bowercopy', 'concat', 'uglify']);
 };

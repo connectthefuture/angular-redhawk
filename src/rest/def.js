@@ -43,7 +43,6 @@
 
         /*
          * Runs through the updateFinished methods.  Any that return false are removed from the list.
-         * TODO: Incorporate this behavior into a base class for all factories.
          */
         var _runAllUpdatesFinished = function() {
           var f = self.updateFinished.length;
@@ -53,9 +52,31 @@
           }
         }
 
+        /* 
+         * If this factory has a 'properties' field (most do) update
+         * each with a helpful flag for the UI to use.
+         */
+        var _embelishProperties = function () {
+          if (self.hasOwnProperty('properties')) {
+            angular.forEach(self.properties, function(prop) {
+
+              // Legacy, deprecated
+              var isConfigurable = prop.kinds && prop.kinds.indexOf('configure') > -1;
+              var isAllocable = prop.kinds && prop.kinds.indexOf('allocation') > -1;
+
+              // 2.0+
+              var isProperty = prop.kinds && prop.kinds.indexOf('property') > -1;
+
+              // Set canEdit
+              prop.canEdit = prop.mode != 'readonly' && (isConfigurable || isAllocable || isProperty);
+            });
+          }
+        }
+
         self._update = function(updateData) {
           if (!!updateData) {
               angular.extend(self, updateData);
+              _embelishProperties();
               _runAllUpdatesFinished();
           }
         }

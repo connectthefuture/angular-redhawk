@@ -1,0 +1,24 @@
+<form role="form" class="form-inline" ng-submit="submit()">
+  <table class="table table-hover table-condensed">
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Value</th>
+      </tr>
+    </thead>
+    <tbody ar-widget-property-tbody 
+      ng-repeat="prop in rhProperties | orderBy: 'name'"  
+      item="prop"
+      allow-edit="allowEdits">
+    </tbody>
+
+    <tfoot ng-show="allowEdits">
+      <tr>
+        <td></td>
+        <td>
+          <button type="submit" class="btn btn-link">Submit</button>
+        </td>
+      </tr>
+    </tfoot>
+  </table>
+</form>

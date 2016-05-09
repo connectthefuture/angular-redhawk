@@ -1,0 +1,44 @@
+<!-- Detail view of a device manager -->
+<div class="row">
+  <div class="col-md-12">
+    <h2>{{ deviceManager.name }}</h2>
+
+    <h3>Properties</h3>
+    <ar-widget-properties 
+      item="deviceManager.properties">
+    </ar-widget-properties>
+
+    <!-- Show devices as a grid view -->
+    <div ng-hide="true == hideDevices">
+      <div ng-show="deviceManager.devices.length > 0">
+        <h3>Devices</h3>
+        <ar-gridview>
+          <ar-widget-device
+            ng-repeat="device in deviceManager.devices"
+            callback="deviceCallback()(device)"
+            item="device.id"
+            parent-id="deviceManager.id">
+          </ar-widget-device>
+        </ar-gridview>
+      </div>
+      <div ng-show="deviceManager.devices.length == 0">
+        <h3>No Devices Found</h3>
+      </div>
+    </div>
+
+    <!-- Show services grid vs. panel -->
+    <!-- TODO: Support services better -->
+    <div ng-hide="true == hideServices">
+      <div ng-show="deviceManager.services.length > 0">
+        <h3>Services</h3>
+        <dl class="dl-horizontal">
+          <dt ng-repeat-start="service in deviceManager.services">{{ service.name }}</dt>
+          <dd ng-repeat-end>{{ service.id }}</dd>
+        </dl>
+      </div>
+      <div ng-show="deviceManager.services.length == 0">
+        <h3>No Services Found</h3>
+      </div>
+    </div>
+  </div>
+</div>

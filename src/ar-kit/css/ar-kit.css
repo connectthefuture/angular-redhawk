@@ -1,0 +1,22 @@
+/* Shrink the REDHAWK icon in the nav bar
+   to fit within the confines of the bar as
+   well as make the hover be REDHAWK red. */
+.redhawk-nav-icon {
+    height: 40px; 
+    margin-top: -10px;
+}
+
+.danger-pulse {
+    animation: pulse 2s infinite;
+}
+@keyframes pulse {
+    0% {
+        background-color : transparent;
+    }
+    50% {
+        background-color : #BA0600;
+    }
+    100% {
+        background-color : transparent;
+    }
+}

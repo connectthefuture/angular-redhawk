@@ -1,0 +1,13 @@
+<ar-widget title-href="{{deviceManagerPath}}" 
+    panel-status="selected ? 'panel-primary' : 'panel-default'">
+  <ar-widget-title>{{ deviceManager.name }}</ar-widget-title>
+  <ar-widget-buttons>
+    <button type="button" ng-click="shutdown()">
+      <span class="danger glyphicon glyphicon-remove" aria-label="Shutdown Device Manager" title="Shutdown"></span>
+    </button>
+  </ar-widget-buttons>
+  <ar-widget-content>
+    <li><span class="badge">{{ deviceManager.devices.length }}</span>Devices</li>
+    <li><span class="badge">{{ deviceManager.services.length }}</span>Services</li>
+  </ar-widget-content>
+</ar-widget>

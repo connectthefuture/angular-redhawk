@@ -1,0 +1,20 @@
+
+<tr>
+  <td ar-widget-property-name-td item="rhProperty"></td>
+  <td><button type="button" class="btn btn-link" ng-click="isCollapsed = !isCollapsed">Show</button></td>
+</tr>
+
+<!-- Re-use simple or simpleSeq if necessary -->
+<ar-widget-property-simple-tr
+  ng-repeat="item in rhProperty.value track by $index" uib-collapse="isCollapsed"
+  ng-if="item.scaType == 'simple'"
+  item="item"
+  allow-edit="(_allowEdit && rhProperty.canEdit)">
+</ar-widget-property-simple-tr>
+
+<ar-widget-property-simple-seq-tr
+  ng-repeat="item in rhProperty.value track by $index" uib-collapse="isCollapsed"
+  ng-if="item.scaType == 'simpleSeq'"
+  item="item"
+  allow-edit="(_allowEdit && rhProperty.canEdit)">
+</ar-widget-property-simple-seq-tr>
