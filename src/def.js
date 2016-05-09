@@ -17,8 +17,11 @@
  * You should have received a copy of the GNU Lesser General Public License
  * along with this program.  If not, see http://www.gnu.org/licenses/.
  */
-angular.module('redhawk', ['redhawk.rest', 'redhawk.util', 'redhawk.sockets', 'redhawk.directives'])
-  .config(['$httpProvider', function($httpProvider) {
+
+var rhModule = angular.module('redhawk', ['redhawk.rest', 'redhawk.util', 'redhawk.sockets', 'redhawk.directives']);
+
+rhModule.config(['$httpProvider', 
+  function($httpProvider) {
     $httpProvider.defaults.transformResponse.unshift(function(response, headersGetter) {
       var ctype = headersGetter('content-type');
       if(ctype && ctype.indexOf('json') > -1) {
@@ -28,5 +31,6 @@ angular.module('redhawk', ['redhawk.rest', 'redhawk.util', 'redhawk.sockets', 'r
         return response;
       }
     });
-  }])
-;
+  }]);
+
+rhModule.distURL = 'bower_components/angular-redhawk/dist/';

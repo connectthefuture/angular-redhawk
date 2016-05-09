@@ -1,0 +1,21 @@
+{
+  "name": "AR-Explorer",
+  "version": "1.0.0",
+  "authors": [
+    "Thomas Goodwin <btgoodwin@geontech.com>",
+    "Patrick Wolfram <pwolfram@geontech.com>"
+  ],
+  "description": "The Angular-REDHAWK Explorer (ARE)",
+  "main": "index.html",
+  "private": true,
+  "ignore": [
+    "**/.*",
+    "bower_components"
+  ],
+  "dependencies": {
+    "angular-redhawk": "https://github.com/geontech/angular-redhawk.git"
+  },
+  "resolutions": {
+    "angular": ">=1.3.8"
+  }
+}

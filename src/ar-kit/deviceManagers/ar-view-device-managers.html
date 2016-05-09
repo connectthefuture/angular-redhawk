@@ -1,0 +1,58 @@
+<!-- Bread crumbs and menu (grid) -->
+<ar-bread-crumbs 
+  ng-hide="null == ARSelectedDomain.inst"
+  crumbs="crumbs" 
+  grid-button-state="collapseGrid"
+  disable-grid-button="null == ARSelectedDomain.inst || null == viewingDeviceManager">
+</ar-bread-crumbs>
+
+<!-- Friendly message to go pick a domain. -->
+<!-- TODO: Replace this with a re-usable "sad face" redirect button to the domain view -->
+<div ng-show="null == ARSelectedDomain.inst">
+  <div class="row">
+    <div class="col-md-12">
+      Click the red flashing icon...
+    </div>
+  </div>
+</div>
+
+<div ng-hide="null == ARSelectedDomain.inst">
+  <!-- Grid view for selecting another device manager or the
+       viewingDeviceManager's devices -->
+  <div class="row" uib-collapse="collapseGrid">
+    <div class="col-md-12">
+      <div class="row">
+        <div class="col-md-12">
+          <h3>Device Managers</h3>
+        </div>
+      </div>
+
+      <!-- Show grid of device managers if not showing a specific device -->
+      <ar-gridview>
+        <ar-widget-device-manager
+          ng-repeat="manager in ARSelectedDomain.inst.deviceManagers" 
+          item="manager.id"
+          selected="manager.id == viewingDeviceManager.id">
+        </ar-widget-device-manager>
+      </ar-gridview>
+    </div>
+  </div>
+
+  <!-- Detail view of the viewingDeviceManager or viewingDevice -->
+  <div class="row" ng-hide="null == viewingDeviceManager && null == viewingDevice">
+    <div class="col-md-12">
+      <ar-detail-device-manager 
+        class="slide"
+        ng-hide="null == viewingDeviceManager || null != viewingDevice"
+        device-manager-id="viewingDeviceManager.id"
+        device-callback="setViewingDevice">
+      </ar-detail-device-manager>
+      <ar-detail-device
+        class="slide"
+        ng-hide="null == viewingDevice"
+        device-id="viewingDevice.id"
+        device-manager-id="viewingDeviceManager.id">
+      </ar-detail-device>
+    </div>
+  </div>
+</div>

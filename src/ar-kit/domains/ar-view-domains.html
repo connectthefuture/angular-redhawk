@@ -1,0 +1,25 @@
+<!-- Bread crumbs and menu (grid) -->
+<ar-bread-crumbs
+  crumbs="crumbs"
+  grid-button-state="collapseGrid"
+  disable-grid-button="!ARSelectedDomain.inst">
+</ar-bread-crumbs>
+
+<!-- Grid view for selecting another domain. -->
+<div class="row" uib-collapse="collapseGrid">
+  <div class="col-md-12">
+    <ar-gridview>
+      <ar-widget-domain 
+        ng-repeat="domainId in ARSelectedDomain.availableDomainIds" 
+        item="domainId">
+      </ar-widget-domain>
+    </ar-gridview>
+  </div>
+</div>
+
+<!-- Detail view of the viewing domain -->
+<div class="row" ng-show="!!viewingDomain">
+  <div class="col-md-12">
+    <ar-detail-domain domain-id="viewingDomain.name"></ar-detail-domain>
+  </div>
+</div>

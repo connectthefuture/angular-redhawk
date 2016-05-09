@@ -1,0 +1,13 @@
+<div class="panel {{panelStatus}}">
+  <div class="panel-heading">
+    <h4 class="panel-title">
+      <div class="pull-right btn-group btn-group-xs shortcuts" ng-transclude="shortcuts">
+        <!-- <button type="button" class="btn btn-link">Resulting Button</button> -->
+      </div>
+      <a ng-transclude="title" class="title" ng-click="titleCallback()"><!--Resulting Title--></a>
+    </h4>
+  </div>
+  <ul class="list-group hidden-xs content" ng-transclude="content">
+    <!-- <li class="list-group-item">Resulting Content</li> -->
+  </ul> 
+</div>

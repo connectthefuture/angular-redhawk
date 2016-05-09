@@ -17,10 +17,12 @@
       * You should have received a copy of the GNU Lesser General Public License                   
       * along with this program.  If not, see http://www.gnu.org/licenses/.                        
       *                                                                                            
-      * angular-redhawk - v0.5.0 - 2016-04-20          
+      * angular-redhawk - v1.0.0 - 2016-05-09          
       */                                                                                           
-     angular.module('redhawk', ['redhawk.rest', 'redhawk.util', 'redhawk.sockets', 'redhawk.directives'])
-  .config(['$httpProvider', function($httpProvider) {
+     var rhModule = angular.module('redhawk', ['redhawk.rest', 'redhawk.util', 'redhawk.sockets', 'redhawk.directives']);
+
+rhModule.config(['$httpProvider', 
+  function($httpProvider) {
     $httpProvider.defaults.transformResponse.unshift(function(response, headersGetter) {
       var ctype = headersGetter('content-type');
       if(ctype && ctype.indexOf('json') > -1) {
@@ -30,14 +32,261 @@
         return response;
       }
     });
-  }])
-;
+  }]);
 
+rhModule.distURL = 'bower_components/angular-redhawk/dist/';
+
+var arkit = angular.module('redhawk.ar-kit', ['redhawk.sockets', 'ngRoute', 'ngAnimate', 'ui.router', 'ui.bootstrap']);
+
+// Give it a root path for importing other files
+var rh = angular.module('redhawk');
+arkit.distURL = rh.distURL + 'ar-kit/';
+
+/* 
+  ARKit path config.  Users can configure these paths and the rest of the ARKit
+  UI elements will inherit the changes.  For example: 
+
+  angular.configure(function(ARPathConfigProvider) {
+    ARPathConfig.setApplications('/myApps');
+    ARPathConfig.setApplicationId('myAppIdKey');
+  }]);
+
+  And then in a directive:
+  
+  angular.directive('MyDirective', function (ARPathConfig) { etc. });
+
+  Note the 'configure' call using ARPathConfigProvider, and the directive (injected)
+  is ARPathConfig.
+ */
+arkit.provider('ARPathConfig', function() {
+  // Helper function to take "/domains" and "domainId" => "/domains/:domainId?"
+  var apply = function (base, id, required) { 
+    return base + '/:' + id + (required ? '' : '?'); 
+  }
+
+  // Top-level paths that can be configured and their $routeParameters tokens
+  var domains         = '/domains';
+  var domainId        = 'domainId';
+  var deviceManagers  = '/deviceManagers';
+  var deviceManagerId = 'deviceManagerId';
+  var applications    = '/applications';
+  var applicationId   = 'applicationId';
+  var devices         = '/devices';
+  var deviceId        = 'deviceId';
+  var services        = '/services';
+  var serviceId       = 'serviceId';
+  var components      = '/components';
+  var componentId     = 'componentId';
+  var allocations     = '/allocations';
+  var allocationId    = 'allocationId';
+
+  this.setDomains         = function (v) { domains         = v; }
+  this.setDomainId        = function (v) { domainId        = v; }
+  this.setDeviceManagers  = function (v) { deviceManagers  = v; }
+  this.setDeviceManagerId = function (v) { deviceManagerId = v; }
+  this.setApplications    = function (v) { applications    = v; }
+  this.setApplicationId   = function (v) { applicationId   = v; }
+  this.setDevices         = function (v) { devices         = v; }
+  this.setDeviceId        = function (v) { deviceId        = v; }
+  this.setServices        = function (v) { services        = v; }
+  this.setServiceId       = function (v) { serviceId       = v; }
+  this.setComponents      = function (v) { components      = v; }
+  this.setComponentId     = function (v) { componentId     = v; }
+  this.setAllocations     = function (v) { allocations      = v; }
+  this.setAllocationId    = function (v) { allocationId     = v; }
+
+  // Compiled routes
+  this.domain        = function () { return apply(domains, domainId); }
+  this.deviceManager = function () { return apply(deviceManagers, deviceManagerId); }
+  this.application   = function () { return apply(applications, applicationId); }
+  this.device        = function () { return apply(deviceManagers, deviceManagerId, true) + apply(devices,  deviceId); }
+  this.service       = function () { return apply(deviceManagers, deviceManagerId, true) + apply(services, serviceId); }
+  this.component     = function () { return apply(applications, applicationId, true) +  apply(components, componentId); }
+  this.allocation    = function () { return apply(allocations, allocationId); }
+  var self = this;
+
+  this.$get = function () {
+    return {
+      // Individual parameters
+      domains         : domains,
+      deviceManagers  : deviceManagers,
+      applications    : applications,
+      devices         : devices,
+      services        : services,
+      components      : components,
+      allocations     : allocations,
+      domainId        : domainId,
+      deviceManagerId : deviceManagerId,
+      applicationId   : applicationId,
+      deviceId        : deviceId,
+      serviceId       : serviceId,
+      componentId     : componentId,
+      allocationId    : allocationId,
+
+      // Compiled routes (interpolatable)
+      domain          : self.domain(),
+      deviceManager   : self.deviceManager(),
+      application     : self.application(),
+      device          : self.device(),
+      service         : self.service(),
+      component       : self.component(),
+      allocation      : self.allocation(),
+
+      // Interpolator, pass a compiled route and list of parameters to inject, in order.
+      // Adapted from: http://www.bennadel.com/blog/2613-using-url-interpolation-with-http-in-angularjs.htm
+      //
+      // params is a map of IDs (above) to user-defined values.
+      //     var params = {};
+      //     params(ARPathConfig.domainId, 'REDHAWK_DEV');
+      //     var path = ARPathConfig.interpolate(ARPathConfig.domain, params);
+      //     // Result is /domains/REDHAW_DEV?
+      interpolate     : function (route, params) {
+        localParams = (angular.extend({}, params) || {});
+
+        route = route.replace( /(\(\s*|\s*\)|\s*\|\s*)/g, "" );
+
+        // Replace each label in the URL (ex, :domainId).
+        route = route.replace(
+          /:([a-z]\w*)/gi,
+          function( $0, label ) {
+            return( popFirstKey( localParams, label ) || "" );
+          }
+        );
+
+        // Strip out any repeating slashes (but NOT the http:// version).
+        route = route.replace( /(^|[^:])[\/]{2,}/g, "$1/" );
+
+        // Strip out any trailing slash.
+        route = route.replace( /\/+$/i, "" );
+
+        // Take 1...N objects and key and perform popKey on the first object
+        // that has the given key. All others with the same key are ignored.
+        function popFirstKey( object1, objectN, key ) {
+          // Convert the arguments list into a true array so we can easily
+          // pluck values from either end.
+          var objects = Array.prototype.slice.call( arguments );
+
+          // The key will always be the last item in the argument collection.
+          var key = objects.pop();
+
+          var object = null;
+
+          // Iterate over the arguments, looking for the first object that
+          // contains a reference to the given key.
+          while ( object = objects.shift() ) {
+            if ( object.hasOwnProperty( key ) ) {
+              return( popKey( object, key ) );
+            }
+          }
+        }
+        
+        // Delete the key from the given object and return the value.
+        function popKey( object, key ) {
+          var value = object[ key ];
+          delete( object[ key ] );
+          return( value );
+        }
+
+        return( route.replace('?','') );
+      }
+    }
+  }
+});
+
+/* 
+  Data for the top-level view controllers that can be used 
+  when configuring $routeProvider.
+ */
+arkit.constant('ARDefaultViews', {
+    domains : {
+      templateUrl : 'ar-kit/domains/ar-view-domains.html',
+      controller  : 'ARDomainsController'
+    },
+    deviceManagers : {
+      templateUrl : 'ar-kit/deviceManagers/ar-view-device-managers.html',
+      controller  : 'ARDeviceManagersController'
+    },
+    applications : {
+      templateUrl : 'ar-kit/applications/ar-view-applications.html',
+      controller  : 'ARApplicationsController'
+    },
+    allocations : {
+      templateUrl : 'ar-kit/allocations/ar-view-allocations.html',
+      controller  : 'ARAllocationsController'
+    }
+  });
+
+// Simple service for holding the presently-selected domain factory instance
+arkit.service('ARSelectedDomain', ['REDHAWK', 
+  function (REDHAWK) {
+    var self = this;
+
+    // Kick off the main listener and expose the list of IDs
+    REDHAWK.enablePush();
+    self.availableDomainIds = REDHAWK.domainIds;
+
+    // Domain selection
+    self.inst = null;
+    self.setSelectedDomain = function(id, factory) {
+      if (!!id)
+        self.inst = REDHAWK.getDomain(id, factory);
+      else
+        self.inst = null;
+    }
+  }]);
+
+/*
+  ARIndicatorService service provides a means to track a value
+  based on a common identifier for use in badges, etc.
+
+  For example, the arNavbarItem directive uses it with the "route"
+  to establish if indications should be showing for that navbar item.
+ */
+arkit.service('ARIndicatorService', 
+  function () {
+    var indicators = [];
+
+    this.getIndication = function (identifier) {
+      return findIndication(identifier).value;
+    }
+
+    this.setIndication = function (identifier, value) {
+      var indicator = findIndication(identifier);
+      indicator.value = value;
+    }
+
+    var findIndication = function (identifier) {
+      var indicator = null;
+
+      for (var i = 0, len = indicators.length; i < len; i++) {
+        if (identifier == indicators[i].identifier) {
+          indicator = indicators[i];
+          break;
+        }
+      }
+      // Create a new one.
+      if (!indicator) {
+        indicator = { identifier: identifier, value: 0 };
+        indicators.push(indicator);
+      }
+      return indicator;
+    }
+  });
+
+// Tacking on a helper function to all scopes for determining if a location (path) is
+// the presently viewed path according to the router.
+arkit.run(['$rootScope', '$location', 
+  function($rootScope, $location) {
+    $rootScope.isViewLocationActive = function (viewLocation) {
+      return viewLocation === $location.path();
+    }
+  }]);
 /**
  * Top-level module definition for redhawk.directives.  Encapsulates all directives,
  * views, and view controllers as well some filters (here, below).
  */
-angular.module('redhawk.directives', ['redhawk.sockets', 'ngRoute'])
+angular.module('redhawk.directives', 
+  ['redhawk.sockets', 'ngRoute', 'ngAnimate', 'ui.router', 'ui.bootstrap'])
   /*
    * Splits the given ID by the "::" syntax that is common and yields the last
    * name of the resulting list.
@@ -75,7 +324,6 @@ angular.module('redhawk.rest', ['ngResource'])
 
         /*
          * Runs through the updateFinished methods.  Any that return false are removed from the list.
-         * TODO: Incorporate this behavior into a base class for all factories.
          */
         var _runAllUpdatesFinished = function() {
           var f = self.updateFinished.length;
@@ -85,9 +333,31 @@ angular.module('redhawk.rest', ['ngResource'])
           }
         }
 
+        /* 
+         * If this factory has a 'properties' field (most do) update
+         * each with a helpful flag for the UI to use.
+         */
+        var _embelishProperties = function () {
+          if (self.hasOwnProperty('properties')) {
+            angular.forEach(self.properties, function(prop) {
+
+              // Legacy, deprecated
+              var isConfigurable = prop.kinds && prop.kinds.indexOf('configure') > -1;
+              var isAllocable = prop.kinds && prop.kinds.indexOf('allocation') > -1;
+
+              // 2.0+
+              var isProperty = prop.kinds && prop.kinds.indexOf('property') > -1;
+
+              // Set canEdit
+              prop.canEdit = prop.mode != 'readonly' && (isConfigurable || isAllocable || isProperty);
+            });
+          }
+        }
+
         self._update = function(updateData) {
           if (!!updateData) {
               angular.extend(self, updateData);
+              _embelishProperties();
               _runAllUpdatesFinished();
           }
         }
@@ -184,6 +454,851 @@ angular.module('redhawk.util', ['toastr'])
     });
   })
 ;
+var arkit = angular.module('redhawk.ar-kit');
+ 
+// Allocations view controller
+arkit.controller('ARAllocationsController', 
+         ['$scope', '$routeParams', 'ARSelectedDomain', 'ARPathConfig',
+  function($scope, $routeParams, ARSelectedDomain, ARPathConfig) {
+  }]);
+var arkit = angular.module('redhawk.ar-kit');
+
+// Applications view controller
+arkit.controller('ARApplicationsController', 
+         ['$scope', '$routeParams', 'ARSelectedDomain', 'ARPathConfig',
+  function($scope, $routeParams, ARSelectedDomain, ARPathConfig) {
+    $scope.collapseGrid = false;
+    $scope.viewingApplication = null;
+
+    if (!!$routeParams[ARPathConfig.applicationId]) {
+      $scope.viewingApplication = ARSelectedDomain.inst.getApplication($routeParams[ARPathConfig.applicationId]);
+      $scope.collapseGrid = true;
+    }
+  }]); 
+var arkit = angular.module('redhawk.ar-kit');
+
+// Components view controller
+arkit.controller('ARComponentsController', 
+         ['$scope', '$routeParams', 'ARSelectedDomain', 'ARPathConfig',
+  function($scope, $routeParams, ARSelectedDomain, ARPathConfig) {
+  }]); 
+var arkit = angular.module('redhawk.ar-kit');
+
+// DeviceManagers view controller
+arkit.controller('ARDeviceManagersController', 
+         ['$scope', '$routeParams', 'ARSelectedDomain', 'ARPathConfig','ARBreadCrumb',
+  function($scope, $routeParams, ARSelectedDomain, ARPathConfig, ARBreadCrumb) {
+    var deviceManagersPath = ARPathConfig.deviceManagers;
+    $scope.crumbs = [ARBreadCrumb.crumb('Device Managers', deviceManagersPath)];
+
+    $scope.collapseGrid = false;
+    $scope.viewingDeviceManager = null;
+    $scope.ARSelectedDomain = ARSelectedDomain;
+
+    // Automatically load the device manager if it's in the route parameters
+    if (!!$routeParams[ARPathConfig.deviceManagerId] && !!ARSelectedDomain.inst) {
+      var viewingDeviceManager = ARSelectedDomain.inst.getDeviceManager($routeParams[ARPathConfig.deviceManagerId]);
+      viewingDeviceManager.$promise.then(function() {
+        $scope.viewingDeviceManager = viewingDeviceManager;
+
+        $scope.crumbs.push(
+          ARBreadCrumb.crumb(
+            $scope.viewingDeviceManager.name, 
+            function () { $scope.clearViewingDevice(); })
+          );
+      });
+    }
+
+    // Controls for setting/clearing the viewingDevice and managing the change to the crumbs.
+    $scope.viewingDevice = null;
+    $scope.setViewingDevice = function (device) {
+      $scope.viewingDevice = device;
+      $scope.crumbs.push(ARBreadCrumb.crumb(device.name, ''));
+    }
+    $scope.clearViewingDevice = function () {
+      $scope.viewingDevice = null;
+      $scope.crumbs.pop();
+    }
+  }]);
+
+/*
+  A widget for the domain specified by the ID given to "item"
+  Just a reminder, the ID is actually REDHAWK_DEV, not the UUID which is also
+  required to be unique.  We're keeping the "ID" term for consistency 
+  with the other UI elements.
+ */
+arkit.directive('arWidgetDeviceManager', function (ARSelectedDomain, ARPathConfig) {
+  return {
+    templateUrl   : 'ar-kit/deviceManagers/ar-widget-device-manager.html',
+    restrict      : 'E',
+    scope : {
+      deviceManagerId : "=item",
+      selected : "=?"
+    },
+    link : function (scope, element, attrs, ctrls) {
+      scope.selected = scope.selected || false;
+      scope.deviceManager = null;
+      scope.$watch('deviceManagerId', function (id) {
+        if (!!id && !!ARSelectedDomain.inst) {
+          var deviceManager = ARSelectedDomain.inst.getDeviceManager(id);
+          deviceManager.$promise.then(function () {
+            scope.deviceManager = deviceManager;
+
+            // Build an interpolator mapping to build the url.
+            var mapping = {};
+            mapping[ARPathConfig.deviceManagerId] = scope.deviceManagerId;
+
+            scope.deviceManagerPath = ARPathConfig.interpolate(
+              ARPathConfig.deviceManager, mapping);
+          });
+        }
+        else {
+          scope.deviceManager = null;
+          scope.deviceManagerPath = ARPathConfig.deviceManagers;
+        }
+      });
+
+      scope.shutdown = function () {
+        console.warn("Shutdown feature not implemented in this release.");
+      }
+    }
+  }
+});
+
+/* 
+ * A Device manager's detail view
+ * hideDevices and hide
+ */
+arkit.directive('arDetailDeviceManager', function (ARSelectedDomain) {
+  return {
+    templateUrl     : 'ar-kit/deviceManagers/ar-detail-device-manager.html',
+    restrict        : 'E',
+    scope           : {
+      deviceManagerId : "=",
+      hideDevices     : "=?",
+      hideServices    : "=?",
+      deviceCallback  : "&?",
+      serviceCallback : "&?"
+    },
+    link : function (scope) {
+      scope.hideDevices = scope.hideDevices || false;
+      scope.hideServices = scope.hideServices || false;
+
+      scope.deviceManager = null;
+      scope.$watch('deviceManagerId', function (id) {
+        if (!!id && !!ARSelectedDomain.inst) {
+          var deviceManager = ARSelectedDomain.inst.getDeviceManager(id);
+          deviceManager.$promise.then(function () {
+            scope.deviceManager = deviceManager;
+          });
+        }
+        else {
+          scope.deviceManager = null;
+        }
+      });
+    }
+  }
+});
+var arkit = angular.module('redhawk.ar-kit');
+
+/*
+ * Widget for a Device
+ * The deviceId and deviceManagerId are both required (item and parentId, respectively)
+ * The callback is for a function to use for when clicking the device name in the panel
+ * title in lieu of falling back to the paths defined in ARPathConfig (i.e., utilizing
+ * the $routeProvider configuration the user specified).
+ */
+arkit.directive('arWidgetDevice', function($location, ARSelectedDomain, ARPathConfig) {
+  return {
+    templateUrl  : 'ar-kit/devices/ar-widget-device.html',
+    restrict     : 'E',
+    scope : {
+      deviceId        : "=item",
+      deviceManagerId : "=parentId",
+      callback        : "&?"
+    },
+    link : function (scope, element, attrs, ctrls) {
+      
+      scope.$watchGroup(['deviceId', 'deviceManagerId'], function (old, ids) {
+        var deviceId = ids[0];
+        var deviceManagerId = ids[1];
+        if (!!deviceId && !!deviceManagerId) {
+          var device = ARSelectedDomain.inst.getDevice(deviceId, deviceManagerId);
+          device.$promise.then(function() { scope.device = device; });
+        }
+        else {
+          scope.device = null;
+        }
+      });
+
+      scope.devicesPath = ARPathConfig.interpolate(
+        ARPathConfig.device, 
+        [scope.deviceManagerId, '']);
+
+      scope.$watch('device', function(device) {
+        scope.isFEI = false;
+        scope.feiKind = '';
+        if (!!device && device.hasOwnProperty('properties')) {
+          var prop = null;
+          for (var i=0, len=device.properties.length; i < len; i++) {
+            prop = device.properties[i];
+            if (prop.name == 'device_kind') {
+              if (prop.value.match(/^FRONTEND/)) {
+                scope.feiKind = prop.value;
+                scope.isFEI = true;
+                break;
+              }
+            }
+          }
+        }
+      });
+
+      // TODO: Implement these on the back-end, map through
+      // the middleware and attach here.
+      scope.start = function () {
+        console.warn('Feature not supported');
+      }
+      scope.stop = scope.start;
+    }
+  }
+});
+
+arkit.directive('arDetailDevice', function(ARSelectedDomain, ARPathConfig) {
+  return {
+    templateUrl   : 'ar-kit/devices/ar-detail-device.html',
+    restrict      : 'E',
+    scope : {
+      deviceId        : '=',
+      deviceManagerId : '=',
+    },
+    link : function (scope) {
+      scope.$watchGroup(['deviceId', 'deviceManagerId'], function (ids, old) {
+        var deviceId = ids[0];
+        var deviceManagerId = ids[1];
+
+        if (!!deviceId && !!deviceManagerId) {
+          var device = ARSelectedDomain.inst.getDevice(deviceId, deviceManagerId);
+          device.$promise.then(function() { scope.device = device; });
+        }
+        else {
+          scope.device = null;
+        }
+      });
+    }
+  }
+});
+var arkit = angular.module('redhawk.ar-kit');
+ 
+// Domains view controller
+arkit.controller('ARDomainsController', 
+       ['$scope', '$routeParams', 'REDHAWK', 'ARSelectedDomain', 'ARPathConfig', 'ARBreadCrumb',
+  function($scope, $routeParams, REDHAWK, ARSelectedDomain, ARPathConfig, ARBreadCrumb) {
+    $scope.crumbs = [ARBreadCrumb.crumb('Domains', '#' + ARPathConfig.domains)];
+    $scope.viewingDomain = null;
+    $scope.collapseGrid = false;
+
+    // If the routeparams for domainId was passed in, use it.
+    if (!!$routeParams[ARPathConfig.domainId]) {
+      $scope.collapseGrid = true;
+      var domain = REDHAWK.getDomain($routeParams[ARPathConfig.domainId]);
+      domain.$promise.then(function () {
+        $scope.viewingDomain = domain;
+        $scope.crumbs.push(ARBreadCrumb.crumb($scope.viewingDomain.name, ''));
+      });
+    }
+
+    // Expose the ARSelectedDomain to the scope
+    $scope.ARSelectedDomain = ARSelectedDomain;
+    $scope.$watchGroup(['ARSelectedDomain.inst', 'domain'], function(old, insts) {
+      $scope.selected = insts[0] == insts[1];
+    });
+  }]);
+
+/*
+  A widget for the domain specified by the ID given to "item"
+  Just a reminder, the ID is actually REDHAWK_DEV, not the UUID which is also
+  required to be unique.  We're keeping the "ID" term for consistency 
+  with the other UI elements.
+ */
+arkit.directive('arWidgetDomain', function (REDHAWK, ARSelectedDomain, ARPathConfig) {
+  return {
+    templateUrl   : 'ar-kit/domains/ar-widget-domain.html',
+    restrict      : 'E',
+    scope : {
+      domainId  : "=item",
+    },
+    link : function (scope, element, attrs, ctrls) {
+      scope.domain = null;
+      scope.domainPath = '#' + ARPathConfig.domains;
+      scope.$watch('domainId', function (id) {
+        if (!!id) {
+          var domain = REDHAWK.getDomain(id);
+          domain.$promise.then(function() { 
+            scope.domain = domain;
+
+            var param = {};
+            param[ARPathConfig.domainId] = id; 
+            scope.domainPath = ARPathConfig.interpolate(ARPathConfig.domain, param);
+          });
+        }
+      });
+
+      // Watch the instance to determine if we're selected.
+      scope._ARSelectedDomain = ARSelectedDomain;
+      scope.$watch('_ARSelectedDomain.inst', function(inst) {
+        if (!!inst) {
+          scope.selected = scope.domainId == inst.name;
+        }
+        else {
+          scope.selected = false;
+        }
+      });
+
+      // Forward the function to the UI.
+      scope.setAsSelectedDomain = function() { 
+        ARSelectedDomain.setSelectedDomain(scope.domainId); 
+      }
+    }
+  }
+});
+
+// A domain's detail view
+arkit.directive('arDetailDomain', function (REDHAWK, ARSelectedDomain) {
+  return {
+    templateUrl     : 'ar-kit/domains/ar-detail-domain.html',
+    restrict        : 'E',
+    scope           : {
+      domainId  : "="
+    },
+    link            : function(scope) {
+      scope.$watch('domainId', function (id) {
+        if (!!id) {
+          var domain = REDHAWK.getDomain(id);
+          domain.$promise.then(function() { scope.domain = domain; });
+        }
+        else {
+          scope.domain = null;
+        }
+      });
+
+      // Watch the instance to determine if we're selected.
+      scope._ARSelectedDomain = ARSelectedDomain;
+      scope.$watch('_ARSelectedDomain.inst', function(inst) {
+        if (!!inst && !!scope.domain) {
+          scope.selected = scope.domain.name == inst.name;
+        }
+        else {
+          scope.selected = false;
+        }
+      });
+
+      // Forward the function to the UI.
+      scope.setAsSelectedDomain = function() { 
+        ARSelectedDomain.setSelectedDomain(scope.domain.name); 
+      }
+    }
+  }
+});
+var arkit = angular.module('redhawk.ar-kit');
+ 
+var arkit = angular.module('redhawk.ar-kit');
+ 
+/*  
+  Lays out a navigation bar at the top of the screen.
+
+  Insert arNavbarItem to populate the collapsable menu.
+
+  The default navbar provides a link to the domains view
+  for selecting the domain to use for the menus.
+
+  The selected domain can be retrieved using the ARSelectedDomain
+  service.
+ */
+arkit.directive('arNavbar', 
+            ['ARSelectedDomain', 'ARPathConfig', 
+    function (ARSelectedDomain, ARPathConfig) {
+      return {
+        templateUrl:  'ar-kit/generics/ar-navbar.html',
+        restrict:     'E',
+        replace:      true,
+        transclude:   true,
+        scope:  {
+          brandImage          : '@?', // Defaults to the REDHAWK icon
+          invert              : '@?' // Invert navbar color scheme, default false
+        },
+        // Set defaults
+        link: function(scope) {
+          scope.ARSelectedDomain    = ARSelectedDomain;
+          // One-way binding w/ default value trickery.
+          scope._brandImage         = scope.brandImage || arkit.distURL + 'images/redhawk_icon_150px.png';
+          scope._invert             = scope.invert ? scope.invert ===  'true' : false;
+
+          scope.domainsPath = '#' + ARPathConfig.domains;
+        }
+      }
+  }]);
+
+/* 
+ * Insert these within the arNavbar directive tags to add menu elements
+ * for when a domain is selected.  Use the arDefault attribute to select
+ * default routes for the 'applications', 'deviceManagers', or 'allocations'
+ * views that are included by default with arKit.  Otherwise use title and 
+ * route along with the $routeConfig to handle your additional views.
+ */
+arkit.directive('arNavbarItem', function (ARIndicatorService, ARPathConfig) { 
+  return { 
+    restrict : 'E', 
+    replace  : true, 
+    template : 
+      '<li ng-class="{active: isViewLocationActive(route)}" ng-click="clearIndications()"> \
+        <a href="{{route}}">\
+          {{title}}\
+          <span class="badge">{{ getIndications() }}</span>\
+        </a> \
+      </li>',
+    scope : {
+      title     : "@?",
+      route     : "@?",
+      arDefault : "@?"
+    },
+    link : function (scope) {
+      if (!!scope.arDefault) {
+        switch (scope.arDefault) {
+          case 'applications' :
+            scope.title = 'Applications';
+            scope.route = '#' + ARPathConfig.applications;
+            break;
+          case 'deviceManagers' :
+            scope.title = 'Device Managers';
+            scope.route = '#' + ARPathConfig.deviceManagers;
+            break;
+          case 'allocations' : 
+            scope.title = 'Allocations';
+            scope.route = '#' + ARPathConfig.allocations;
+            break;
+          default:
+            console.warn('Unknown arDefault: ' + scope.arDefault);
+            break;
+        }
+      }
+
+      scope.getIndications = function () {
+        var value = ARIndicatorService.getIndication(scope.route).value;
+        if (0 == value)
+          return null;
+        return value;
+      }
+
+      scope.clearIndications = function() {
+        ARIndicatorService.setIndication(scope.route, 0);
+      }
+    }
+  } });
+
+/* Lays out a generic repeater of whatever elements are inside.
+ * Set the columnWidths attribute to override the default which
+ * automatically transitions to a mobile-friendly list of elements
+ * when the screen is too narrow.
+ * 
+ * If designing your own element to go in the gridView, you need to:
+ *
+ *    require: "?^^arGridview"
+ *
+ *    // Within link:
+ *    link: function(scope, el, attr, ctrl) { if (!!ctrl) ctrl.register(el); }
+ */
+arkit.directive('arGridview', function () {
+  return {
+    template      : 
+      '<div class="row" ng-transclude>\
+      </div>',
+    replace       : true,
+    restrict      : 'E',
+    transclude    : true,
+    scope         : {
+      columnWidths : '@?'
+    },
+    controller: function($scope) {
+      $scope.columnWidths = $scope.columnWidths || 'col-lg-3 col-md-4 col-sm-5 col-xs-12';
+      
+      // Inheritable API for contained elements
+      this.register = function (child) {
+        child.addClass('slide');
+        child.addClass($scope.columnWidths); 
+      };
+    }
+  }
+});
+
+// Attribute that makes the panel as tall as it is wide and then over-stuffs it with
+// the logo provided by arLogo.  This is basically a giant watermark.
+arkit.directive('arLogoBackground', function () {
+  return {
+    restrict :  'A',
+    replace  :  false,
+    scope    : {
+      arLogo : '=?'
+    },
+    link     : function(scope, element) {
+      scope.arLogo = scope.arLogo || arkit.distURL + 'images/redhawk-background.svg';
+
+      // For some reason this only works a few times in resizing and then quits.
+      // FIXME: Use $interval to do this?
+      scope.$watch(
+        function () { return element[0].offsetWidth; },
+        function (width) {
+          var widthOversize = width * 1.1;
+          var offset = width * 0.05;
+          element.css({
+            background            : 'url(' + scope.arLogo + ')',
+            'background-size'     : widthOversize + 'px ' + widthOversize + 'px',
+            'background-repeat'   : 'no-repeat',
+            'background-position' : offset + 'px ' + 0 + 'px'
+          });
+        },
+        true);
+    }
+  }
+});
+
+/*
+  Easy breadcrumb manager
+  crumbs should be a list of elements: { name: 'NameToDisplay', action: '#/link path' }
+  Use the ARBreadCrumb provider to quickly make these structures.
+  The action can be a function.
+ */
+arkit.directive('arBreadCrumbs', function ($location) {
+  return {
+    templateUrl : 'ar-kit/generics/ar-bread-crumbs.html',
+    restrict : 'E',
+    replace  : true,
+    transclude : true,
+    scope : {
+      crumbs            : "=",  // a list of bread crumbs to translate
+      gridButtonState   : "=?", // Variable for observing the toggled state of the grid button
+      disableGridButton : "=?"  // Disables the button that would toggle gridButtonState
+    },
+    link : function(scope) {
+      scope.do = function (action) {
+        if (typeof action == 'function')
+          action();
+        else
+          $location.path(action.replace('#','').replace('?',''));
+      }
+    }
+  }
+});
+
+/* 
+ * Creates the "crumb" structure for use with arBreadCrumbs' crumbs list.
+ */
+arkit.provider('ARBreadCrumb', function () {
+  this.$get = function () {
+    return {
+      crumb : function (name, action) { return {name: name, action: action}; }
+    }
+  }
+});
+
+
+/* 
+ * When doing multi-slot transclusion it might be handy to use special tags
+ * as placeholders to keep from accidentally using some non-specific directive.
+ * 
+ * The postTransclude function will lift the contents (or children) out of the
+ * special tag, optionally pass them to a callback, and then attach them to the
+ * parent element whose class matches the named class.  Then the original 
+ * special tags are removed and the parent's special class is stripped.
+ * 
+ * See the behavior of ar-widget vs. ar-widget-device.
+ */
+arkit.provider('ARTransclusionHelper', function() {
+  this.$get = function() {
+    return {
+      postTransclude : function (element, parentSelectorClass, targetSelector, callback) {
+        var parent = element.find(parentSelectorClass);
+        var targets = parent.children().filter(targetSelector);
+        angular.forEach(targets, function(target) {
+          var el = angular.element(target);
+          var insertees = null;
+
+          // If the element has no tags it will only have contents
+          // otherewise it has children.
+          if (el.children().length == 0)
+            insertees = el.contents();
+          else
+            insertees = el.children();
+
+          // Forward to the callback if defined
+          if (typeof callback == 'function')
+            callback(insertees);
+
+          // Move the elements to the parent
+          parent.append(insertees);
+        });
+        // Blow away the original targets
+        targets.remove();
+
+        // Remove that special class
+        parent.removeClass(parentSelectorClass.replace('.',''));
+      }
+    }
+  }
+});
+
+/* 
+ * The ar-widget can be thought of as a base implementation of a widget for use in
+ * container elements.
+ */
+arkit.directive('arWidget', function ($location, ARTransclusionHelper) {
+  return {
+    restrict    : 'E',
+    require     : ['?^^arGridview'],
+    scope       : {
+      titleHref     : '@?',
+      titleCallback : '&?',
+      panelStatus   : '=?',
+    },
+    transclude  : {
+      'title'     : 'arWidgetTitle',
+      'content'   : 'arWidgetContent',
+      'shortcuts' : '?arWidgetButtons',
+    },
+    templateUrl : 'ar-kit/generics/ar-widget.html',
+    link : function(scope, element, attrs, ctrls) {
+      scope.panelStatus = scope.panelStatus || 'panel-default';
+
+      angular.forEach(ctrls, function(c) { if (!!c) c.register(element); });
+
+      // Use the callback provided or use location to redirect using the href.
+      scope.titleCallback = scope.titleCallback || function () {
+        $location.path(scope.titleHref);
+      }
+
+      // Clean up the dom.
+      element.parent().addClass('ar-widget');
+      ARTransclusionHelper.postTransclude(element, '.title', 'ar-widget-title');
+      ARTransclusionHelper.postTransclude(element, '.shortcuts', 'ar-widget-buttons', function(buttons) {
+        buttons.addClass('btn btn-link');
+      });
+      ARTransclusionHelper.postTransclude(element, '.content', 'ar-widget-content', function(lis) {
+        lis.addClass('list-group-item');
+      });
+    }
+  }
+});
+var arkit = angular.module('redhawk.ar-kit');
+
+arkit.directive('arViewPorts', function() {
+  return {
+    restrict : 'E',
+    templateUrl : 'ar-kit/ports/ar-view-ports.html',
+    scope : { ports : '=' }
+  }
+});
+
+/* 
+ * Maintains a list of ports that can be either individually selected 
+ * or multiple-selected.  Use allowMultiple=true to select multiple items.
+ * 'selected' must be either an object ({}) or an array ([]).  The latter 
+ * will allow selection of multiple elements.
+ */
+arkit.directive('arListPorts', function () {
+  return { 
+    restrict : 'E',
+    replace  : true,
+    scope : {
+      ports    : '=',
+      selected : '='
+    },
+    template   : 
+      '<div class="list-group">\
+        <a class="list-group-item" \
+            ng-class="{\'active\' : port in selected}"\
+            ng-click="toggle(port)" \
+            ng-repeat="port in ports">\
+          <ar-span-port port="port"></ar-span-port>\
+        </a>\
+      </div>',
+    link : function (scope) {
+      var allowMultiple = Array.isArray(selected);
+
+      if (allowMultiple) {
+        scope.toggle = function (port) {
+          var idx = -1;
+          for (var i = 0, len = scope.selected.length; i < len; i++) {
+            if (port.name == scope.selected[i].name) {
+              idx = i;
+              break;
+            }
+          }
+
+          if (-1 == idx) {
+            if (false == allowMultiple)
+              scope.selected.clear();
+            scope.selected.push(port);
+          }
+          else {
+            scope.selected.splice(idx, 1);
+          }
+        }
+      }
+      else {
+        scope.toggle = function (port) {
+          if (port.name == scope.selected.name)
+            scope.selected = {};
+          else
+            scope.selected = port;
+        }
+      }
+    }
+  }
+});
+
+arkit.directive('arSpanPort', function () {
+  return {
+    restrict : 'E',
+    scope : {
+      'port' : '=',
+    },
+    templateUrl : 'ar-kit/ports/ar-span-port.html',
+  }
+});
+var arkit = angular.module('redhawk.ar-kit');
+
+
+/* 
+  Widget for properties and an individual property
+ */
+arkit.directive('arWidgetProperties', function () {
+  return {
+    templateUrl     : 'ar-kit/properties/ar-widget-properties.html',
+    restrict        : 'E',
+    scope : {
+      rhProperties  : "=item",
+      // Special to this widget
+      // Callback for when "submit" is pressed
+      formCallback  : "&?",
+    },
+    link : function (scope) {
+      scope.allowEdits = !(scope.formCallback === undefined);
+
+      scope.submit = function () {
+        if (scope.allowEdits) {
+          var props = [];
+          angular.forEach(scope.rhProperties, function(prop) {
+            if (prop.canEdit)
+              props.push(prop);
+          });
+
+          // Pass to the callback.
+          scope.formCallback()(props);
+        }
+
+      }
+    }
+  }
+});
+
+/* 
+  Helper directive that basically acts like an ng-switch that doesn't violate 
+  HTML DOM rules for tables.
+ */
+arkit.directive('arWidgetPropertyTbody', function () {
+  return {
+    templateUrl  : 'ar-kit/properties/ar-widget-property-tbody.html',
+    restrict     : 'A',
+    scope : { 
+      rhProperty : '=item',
+      allowEdit  : '=?'
+    }
+  }
+});
+
+/*
+  Widget for an individual simple property table data cells (2)
+ */
+arkit.directive('arWidgetPropertySimpleTr', function () {
+  return {
+    templateUrl     : 'ar-kit/properties/ar-widget-property-simple-tr.html',
+    restrict        : 'E',
+    replace         : true,
+    scope           : {
+      rhProperty : '=item',
+      allowEdit  : '=?'
+    },
+    link : function(scope) {
+      scope.booleanSelectOptions = [{ name: 'True', value: true }, { name: 'False', value: false }];
+    }
+  }
+});
+/*
+  Widget for an individual simple sequence property table data cells (2)
+ */
+arkit.directive('arWidgetPropertySimpleSeqTr', function () {
+  return {
+    templateUrl     : 'ar-kit/properties/ar-widget-property-simple-seq-tr.html',
+    restrict        : 'E',
+    replace         : true,
+    scope           : {
+      rhProperty : '=item',
+      allowEdit  : '=?'
+    },
+    link : function(scope) { 
+      scope.isCollapsed = false; 
+    }
+  }
+});
+/*
+  Widget for an individual struct property table data cells (2)
+ */
+arkit.directive('arWidgetPropertyStructTr', function () {
+  return {
+    templateUrl     : 'ar-kit/properties/ar-widget-property-struct-tr.html',
+    restrict        : 'E',
+    replace         : true,
+    scope           : {
+      rhProperty : '=item',
+      allowEdit  : '=?'
+    },
+    link : function(scope) { 
+      scope.isCollapsed = false; 
+    }
+  }
+});
+/*
+  Widget for an individual struct sequence property table data cells (2)
+ */
+arkit.directive('arWidgetPropertyStructSeqTr', function () {
+  return {
+    templateUrl     : 'ar-kit/properties/ar-widget-property-struct-seq-tr.html',
+    restrict        : 'E',
+    replace         : true,
+    scope           : {
+      rhProperty : '=item',
+      allowEdit  : '=?'
+    },
+    link : function(scope) { 
+      scope.isCollapsed = false; 
+    }
+  }
+});
+
+/*
+  Widget for an individual property's table data elements (i.e., a row)
+  This displays the property name.  You should be looking to use the other
+  arWidgetProperty* directives instead if you want a whole row.
+ */
+arkit.directive('arWidgetPropertyNameTd', function () {
+  return {
+    templateUrl     : 'ar-kit/properties/ar-widget-property-name-td.html',
+    restrict        : 'A',
+    replace         : true,
+    scope           : {
+      rhProperty : '=item',
+    }
+  }
+});
 /*
   Extendable Angular-REDHAWK factory represents a single Component instance.
 
@@ -1434,12 +2549,12 @@ angular.module('redhawk.rest')
       this.domain = $resource(Config.domainsUrl, {}, {
         query:        {method: 'GET', cache:false},
         info:         {method: 'GET', url: Config.domainUrl, cache:false},
+        configure:    {method: 'PUT', url: Config.domainUrl + '/properties'}
       });
 
-      /* Retaining for future upcoming feature 
       this.fileSystem = $resource(Config.domainUrl + '/fs/:path', {}, {
         query:        {method: 'GET', cache:false}
-      }); */
+      });
 
       this.deviceManager = $resource(Config.deviceManagerUrl, {}, {
         query:        {method: 'GET', cache:false}
@@ -2714,6 +3829,544 @@ angular.module('redhawk.directives').run(['$templateCache', function($templateCa
     "    <dd><span ng-repeat=\"prop in obj.properties\">{{ prop.id }}<br></span></dd>\n" +
     "</dl>\n" +
     "</div>"
+  );
+
+}]);
+
+angular.module('redhawk.ar-kit').run(['$templateCache', function($templateCache) {
+  'use strict';
+
+  $templateCache.put('ar-kit/allocations/ar-view-allocations.html',
+    ""
+  );
+
+
+  $templateCache.put('ar-kit/applications/ar-view-applications.html',
+    ""
+  );
+
+
+  $templateCache.put('ar-kit/deviceManagers/ar-detail-device-manager.html',
+    "<!-- Detail view of a device manager -->\n" +
+    "<div class=\"row\">\n" +
+    "  <div class=\"col-md-12\">\n" +
+    "    <h2>{{ deviceManager.name }}</h2>\n" +
+    "\n" +
+    "    <h3>Properties</h3>\n" +
+    "    <ar-widget-properties \n" +
+    "      item=\"deviceManager.properties\">\n" +
+    "    </ar-widget-properties>\n" +
+    "\n" +
+    "    <!-- Show devices as a grid view -->\n" +
+    "    <div ng-hide=\"true == hideDevices\">\n" +
+    "      <div ng-show=\"deviceManager.devices.length > 0\">\n" +
+    "        <h3>Devices</h3>\n" +
+    "        <ar-gridview>\n" +
+    "          <ar-widget-device\n" +
+    "            ng-repeat=\"device in deviceManager.devices\"\n" +
+    "            callback=\"deviceCallback()(device)\"\n" +
+    "            item=\"device.id\"\n" +
+    "            parent-id=\"deviceManager.id\">\n" +
+    "          </ar-widget-device>\n" +
+    "        </ar-gridview>\n" +
+    "      </div>\n" +
+    "      <div ng-show=\"deviceManager.devices.length == 0\">\n" +
+    "        <h3>No Devices Found</h3>\n" +
+    "      </div>\n" +
+    "    </div>\n" +
+    "\n" +
+    "    <!-- Show services grid vs. panel -->\n" +
+    "    <!-- TODO: Support services better -->\n" +
+    "    <div ng-hide=\"true == hideServices\">\n" +
+    "      <div ng-show=\"deviceManager.services.length > 0\">\n" +
+    "        <h3>Services</h3>\n" +
+    "        <dl class=\"dl-horizontal\">\n" +
+    "          <dt ng-repeat-start=\"service in deviceManager.services\">{{ service.name }}</dt>\n" +
+    "          <dd ng-repeat-end>{{ service.id }}</dd>\n" +
+    "        </dl>\n" +
+    "      </div>\n" +
+    "      <div ng-show=\"deviceManager.services.length == 0\">\n" +
+    "        <h3>No Services Found</h3>\n" +
+    "      </div>\n" +
+    "    </div>\n" +
+    "  </div>\n" +
+    "</div>"
+  );
+
+
+  $templateCache.put('ar-kit/deviceManagers/ar-view-device-managers.html',
+    "<!-- Bread crumbs and menu (grid) -->\n" +
+    "<ar-bread-crumbs \n" +
+    "  ng-hide=\"null == ARSelectedDomain.inst\"\n" +
+    "  crumbs=\"crumbs\" \n" +
+    "  grid-button-state=\"collapseGrid\"\n" +
+    "  disable-grid-button=\"null == ARSelectedDomain.inst || null == viewingDeviceManager\">\n" +
+    "</ar-bread-crumbs>\n" +
+    "\n" +
+    "<!-- Friendly message to go pick a domain. -->\n" +
+    "<!-- TODO: Replace this with a re-usable \"sad face\" redirect button to the domain view -->\n" +
+    "<div ng-show=\"null == ARSelectedDomain.inst\">\n" +
+    "  <div class=\"row\">\n" +
+    "    <div class=\"col-md-12\">\n" +
+    "      Click the red flashing icon...\n" +
+    "    </div>\n" +
+    "  </div>\n" +
+    "</div>\n" +
+    "\n" +
+    "<div ng-hide=\"null == ARSelectedDomain.inst\">\n" +
+    "  <!-- Grid view for selecting another device manager or the\n" +
+    "       viewingDeviceManager's devices -->\n" +
+    "  <div class=\"row\" uib-collapse=\"collapseGrid\">\n" +
+    "    <div class=\"col-md-12\">\n" +
+    "      <div class=\"row\">\n" +
+    "        <div class=\"col-md-12\">\n" +
+    "          <h3>Device Managers</h3>\n" +
+    "        </div>\n" +
+    "      </div>\n" +
+    "\n" +
+    "      <!-- Show grid of device managers if not showing a specific device -->\n" +
+    "      <ar-gridview>\n" +
+    "        <ar-widget-device-manager\n" +
+    "          ng-repeat=\"manager in ARSelectedDomain.inst.deviceManagers\" \n" +
+    "          item=\"manager.id\"\n" +
+    "          selected=\"manager.id == viewingDeviceManager.id\">\n" +
+    "        </ar-widget-device-manager>\n" +
+    "      </ar-gridview>\n" +
+    "    </div>\n" +
+    "  </div>\n" +
+    "\n" +
+    "  <!-- Detail view of the viewingDeviceManager or viewingDevice -->\n" +
+    "  <div class=\"row\" ng-hide=\"null == viewingDeviceManager && null == viewingDevice\">\n" +
+    "    <div class=\"col-md-12\">\n" +
+    "      <ar-detail-device-manager \n" +
+    "        class=\"slide\"\n" +
+    "        ng-hide=\"null == viewingDeviceManager || null != viewingDevice\"\n" +
+    "        device-manager-id=\"viewingDeviceManager.id\"\n" +
+    "        device-callback=\"setViewingDevice\">\n" +
+    "      </ar-detail-device-manager>\n" +
+    "      <ar-detail-device\n" +
+    "        class=\"slide\"\n" +
+    "        ng-hide=\"null == viewingDevice\"\n" +
+    "        device-id=\"viewingDevice.id\"\n" +
+    "        device-manager-id=\"viewingDeviceManager.id\">\n" +
+    "      </ar-detail-device>\n" +
+    "    </div>\n" +
+    "  </div>\n" +
+    "</div>\n"
+  );
+
+
+  $templateCache.put('ar-kit/deviceManagers/ar-widget-device-manager.html',
+    "<ar-widget title-href=\"{{deviceManagerPath}}\" \n" +
+    "    panel-status=\"selected ? 'panel-primary' : 'panel-default'\">\n" +
+    "  <ar-widget-title>{{ deviceManager.name }}</ar-widget-title>\n" +
+    "  <ar-widget-buttons>\n" +
+    "    <button type=\"button\" ng-click=\"shutdown()\">\n" +
+    "      <span class=\"danger glyphicon glyphicon-remove\" aria-label=\"Shutdown Device Manager\" title=\"Shutdown\"></span>\n" +
+    "    </button>\n" +
+    "  </ar-widget-buttons>\n" +
+    "  <ar-widget-content>\n" +
+    "    <li><span class=\"badge\">{{ deviceManager.devices.length }}</span>Devices</li>\n" +
+    "    <li><span class=\"badge\">{{ deviceManager.services.length }}</span>Services</li>\n" +
+    "  </ar-widget-content>\n" +
+    "</ar-widget>"
+  );
+
+
+  $templateCache.put('ar-kit/devices/ar-detail-device.html',
+    "<!-- Detail view of a device manager -->\n" +
+    "<div class=\"row\" ng-hide=\"null == device\">\n" +
+    "  <div class=\"col-md-12\">\n" +
+    "    <h2>{{ device.name }}</h2>\n" +
+    "\n" +
+    "    <h3>Properties</h3>\n" +
+    "    <ar-widget-properties \n" +
+    "      item=\"device.properties\">\n" +
+    "    </ar-widget-properties>\n" +
+    "\n" +
+    "    <h3>Ports</h3>\n" +
+    "    <!-- Make a list+detail panel design -->\n" +
+    "  </div>\n" +
+    "</div>\n"
+  );
+
+
+  $templateCache.put('ar-kit/devices/ar-widget-device.html',
+    "<ar-widget title-href=\"devicesPath\" title-callback=\"callback()\"\n" +
+    "    panel-status=\"device.started ? 'panel-success' : 'panel-warning'\">\n" +
+    "  <ar-widget-title>{{ device.name }}</ar-widget-title>\n" +
+    "  <ar-widget-buttons>\n" +
+    "    <button ng-show=\"isFEI\">\n" +
+    "      <span class=\"glyphicon glyphicon-signal\" title=\"{{feiKind}}\"></span>\n" +
+    "    </button>\n" +
+    "    <button ng-show=\"device.started\" ng-click=\"stop()\">\n" +
+    "      <span class=\"glyphicon glyphicon-stop\" title=\"Stop\"></span>\n" +
+    "    </button>\n" +
+    "    <button ng-hide=\"device.started\" ng-click=\"start()\">\n" +
+    "      <span class=\"glyphicon glyphicon-play\"></span>\n" +
+    "    </button>\n" +
+    "  </ar-widget-buttons>\n" +
+    "  <ar-widget-content>\n" +
+    "    <li><span>TODO: List device kind and device name?</span></li>\n" +
+    "  </ar-widget-content>\n" +
+    "</ar-widget>"
+  );
+
+
+  $templateCache.put('ar-kit/domains/ar-detail-domain.html',
+    "<!-- Detail view of a domain -->\n" +
+    "<div class=\"row\">\n" +
+    "  <div class=\"col-md-12\">\n" +
+    "    <h2>{{ domain.name }}</h2>\n" +
+    "\n" +
+    "    <p ng-show=\"selected\">Use the menu (above) to navigate the domain.</p>\n" +
+    "    <p ng-show=\"!selected\" class=\"text-info\"><button type=\"button\" class=\"btn btn-link\" ng-click=\"setAsSelectedDomain()\">Select this domain</button></p>\n" +
+    "\n" +
+    "    <h3>Properties</h3>\n" +
+    "    <ar-widget-properties \n" +
+    "      item=\"domain.properties\" \n" +
+    "      form-callback=\"domain.configure\">\n" +
+    "    </ar-widget-properties>\n" +
+    "\n" +
+    "    <h3>Filesystem</h3>\n" +
+    "    Some other info\n" +
+    "    <!-- TODO: List folders, properties -->\n" +
+    "\n" +
+    "    <h3>Event Channels</h3>\n" +
+    "    An event channel viewer panel\n" +
+    "    <!-- TODO: \n" +
+    "            Button to expand a well containing the most recent X messages\n" +
+    "            Field for setting the value of X\n" +
+    "\n" +
+    "      -->\n" +
+    "\n" +
+    "    <!-- TODO: Application, device manager, and allocations listing if not selected. -->\n" +
+    "    <div ng-show=\"!selected\">\n" +
+    "      <h3>Applications</h3>\n" +
+    "      <h3>Device Managers</h3>\n" +
+    "      <h3>Allocations</h3>\n" +
+    "    </div>\n" +
+    "  </div>\n" +
+    "</div>"
+  );
+
+
+  $templateCache.put('ar-kit/domains/ar-view-domains.html',
+    "<!-- Bread crumbs and menu (grid) -->\n" +
+    "<ar-bread-crumbs\n" +
+    "  crumbs=\"crumbs\"\n" +
+    "  grid-button-state=\"collapseGrid\"\n" +
+    "  disable-grid-button=\"!ARSelectedDomain.inst\">\n" +
+    "</ar-bread-crumbs>\n" +
+    "\n" +
+    "<!-- Grid view for selecting another domain. -->\n" +
+    "<div class=\"row\" uib-collapse=\"collapseGrid\">\n" +
+    "  <div class=\"col-md-12\">\n" +
+    "    <ar-gridview>\n" +
+    "      <ar-widget-domain \n" +
+    "        ng-repeat=\"domainId in ARSelectedDomain.availableDomainIds\" \n" +
+    "        item=\"domainId\">\n" +
+    "      </ar-widget-domain>\n" +
+    "    </ar-gridview>\n" +
+    "  </div>\n" +
+    "</div>\n" +
+    "\n" +
+    "<!-- Detail view of the viewing domain -->\n" +
+    "<div class=\"row\" ng-show=\"!!viewingDomain\">\n" +
+    "  <div class=\"col-md-12\">\n" +
+    "    <ar-detail-domain domain-id=\"viewingDomain.name\"></ar-detail-domain>\n" +
+    "  </div>\n" +
+    "</div>\n"
+  );
+
+
+  $templateCache.put('ar-kit/domains/ar-widget-domain.html',
+    "<ar-widget title-href=\"{{domainPath}}\"\n" +
+    "    panel-status=\"selected ? 'panel-primary' : 'panel-default'\">\n" +
+    "  <ar-widget-title>{{ domain.name }}</ar-widget-title>\n" +
+    "  <ar-widget-buttons>\n" +
+    "        <button ng-hide=\"selected\" ng-click=\"setAsSelectedDomain()\">\n" +
+    "          <span class=\"glyphicon glyphicon-ok\" aria-label=\"Set as selected domain\"></span>\n" +
+    "        </button>\n" +
+    "  </ar-widget-buttons>\n" +
+    "  <ar-widget-content>\n" +
+    "    <li><span class=\"badge\">{{ domain.eventChannels.length }}</span>Event Channels</li>\n" +
+    "    <li><span class=\"badge\">{{ domain.applications.length }}</span>Applications</li>\n" +
+    "    <li><span class=\"badge\">{{ domain.deviceManagers.length }}</span>Device Managers</li>\n" +
+    "    <li><span class=\"badge\">{{ domain.allocations.length }}</span>Allocations\n" +
+    "    </li>\n" +
+    "  </ar-widget-content>\n" +
+    "</ar-widget>\n"
+  );
+
+
+  $templateCache.put('ar-kit/generics/ar-bread-crumbs.html',
+    "<div class=\"row\">\n" +
+    "  <div class=\"col-md-12\">\n" +
+    "    <ol class=\"breadcrumb\">\n" +
+    "      <!-- Show the grid toggle button if a state variable was passed into the scope -->\n" +
+    "      <li ng-show=\"gridButtonState != undefined\">\n" +
+    "        <button type=\"button\" \n" +
+    "            class=\"btn btn-link\" \n" +
+    "            ng-click=\"gridButtonState = !gridButtonState\" \n" +
+    "            ng-disabled=\"true == disableGridButton\">\n" +
+    "          <span class=\"glyphicon glyphicon-th\"></span>\n" +
+    "        </button>\n" +
+    "      </li>\n" +
+    "      <!-- Repeat all crumbs marking the last as active -->\n" +
+    "      <li ng-repeat=\"crumb in crumbs\" ng-class=\"{'active':$last}\" class=\"slide\">{{ $last ? crumb.name : '' }}<a ng-show=\"!$last\" ng-click=\"do(crumb.action)\">{{ crumb.name }}</a></li>\n" +
+    "    </ol>\n" +
+    "  </div>\n" +
+    "</div>"
+  );
+
+
+  $templateCache.put('ar-kit/generics/ar-navbar.html',
+    "<nav class=\"navbar navbar-fixed-top\" \n" +
+    "     role=\"navigation\" \n" +
+    "     ng-class=\"{'navbar-inverse': _invert, 'navbar-default' : !_invert}\">\n" +
+    "  <div class=\"container\">\n" +
+    "    <div class=\"navbar-header\">\n" +
+    "      <button type=\"button\" \n" +
+    "              ng-show=\"ARSelectedDomain.inst\"\n" +
+    "              class=\"navbar-toggle collapsed\" \n" +
+    "              data-toggle=\"collapse\" \n" +
+    "              data-target=\"#navbar-collapse-1\">\n" +
+    "        <span class=\"sr-only\">Toggle Menu</span>\n" +
+    "        <span class=\"icon-bar\"></span>\n" +
+    "        <span class=\"icon-bar\"></span>\n" +
+    "        <span class=\"icon-bar\"></span>\n" +
+    "      </button>\n" +
+    "      <a href=\"{{ domainsPath }}\" class=\"navbar-brand\" ng-class=\"{'danger-pulse ': !ARSelectedDomain.inst}\">\n" +
+    "        <img class=\"redhawk-nav-icon\" src=\"{{_brandImage}}\">\n" +
+    "      </a>\n" +
+    "\n" +
+    "      <!-- The float:left is important for when the navbar collapses to the mobile view.  Without it the text\n" +
+    "           re-aligns to the top of the menu, which looks pretty broken. -->\n" +
+    "      <a class=\"navbar-brand\" href=\"{{ domainsPath }}/{{ARSelectedDomain.inst.name}}\">\n" +
+    "        <span class=\"glyphicon glyphicon-arrow-left\" aria-hidden=\"true\" ng-hide=\"ARSelectedDomain.inst\"></span>\n" +
+    "        <span ng-hide=\"ARSelectedDomain.inst\">Pick a Domain</span>\n" +
+    "        <span ng-show=\"ARSelectedDomain.inst\">{{ ARSelectedDomain.inst.name }}</span>\n" +
+    "      </a>\n" +
+    "    </div>\n" +
+    "\n" +
+    "    <!-- Other navbar selection items -->\n" +
+    "    <!-- Shows only if a domain is selected -->\n" +
+    "    <div ng-show=\"ARSelectedDomain.inst\">\n" +
+    "      <div class=\"collapse navbar-collapse\" id=\"navbar-collapse-1\">\n" +
+    "        <ul class=\"nav navbar-nav\" ng-transclude>\n" +
+    "          <!-- Users's ar-navbar-items will be placed here -->\n" +
+    "        </ul>\n" +
+    "      </div>\n" +
+    "    </div> <!-- ng-show -->\n" +
+    "  </div>\n" +
+    "</nav>"
+  );
+
+
+  $templateCache.put('ar-kit/generics/ar-widget.html',
+    "<div class=\"panel {{panelStatus}}\">\n" +
+    "  <div class=\"panel-heading\">\n" +
+    "    <h4 class=\"panel-title\">\n" +
+    "      <div class=\"pull-right btn-group btn-group-xs shortcuts\" ng-transclude=\"shortcuts\">\n" +
+    "        <!-- <button type=\"button\" class=\"btn btn-link\">Resulting Button</button> -->\n" +
+    "      </div>\n" +
+    "      <a ng-transclude=\"title\" class=\"title\" ng-click=\"titleCallback()\"><!--Resulting Title--></a>\n" +
+    "    </h4>\n" +
+    "  </div>\n" +
+    "  <ul class=\"list-group hidden-xs content\" ng-transclude=\"content\">\n" +
+    "    <!-- <li class=\"list-group-item\">Resulting Content</li> -->\n" +
+    "  </ul> \n" +
+    "</div>"
+  );
+
+
+  $templateCache.put('ar-kit/ports/ar-span-port.html',
+    "<span>\n" +
+    "  <div class=\"pull-left\">\n" +
+    "    <span ng-show=\"port.direction == 'Provides'\" class=\"glyphicon glyphicon-triangle-left\"></span>\n" +
+    "  </div>\n" +
+    "  <div class=\"pull-right\">\n" +
+    "    <span ng-show=\"port.idl.type == 'RFInfo'\" class=\"glyphicon glyphicon-list-alt\"><!-- Frontend RFInfo --></span>\n" +
+    "    <span ng-show=\"port.idl.type.endsWith('Tuner')\" class=\"glyphicon glyphicon-signal\"><!-- Frontend *Tuner --></span>\n" +
+    "    <span ng-show=\"port.idl.type == 'GPS'\" class=\"glyphicon glyphicon-screenshot\"><!-- Frontend GPS --></span>\n" +
+    "    <span ng-show=\"port.idl.type == 'BulkIO'\" class=\"glyphicon glyphicon-log-in\"><!-- BulkIO --></span>\n" +
+    "    <span ng-show=\"port.direction == 'Uses'\" class=\"glyphicon glyphicon-triangle-right\"></span>\n" +
+    "  </div>\n" +
+    "  {{port.name}}\n" +
+    "</span>"
+  );
+
+
+  $templateCache.put('ar-kit/ports/ar-view-ports.html',
+    "<div class=\"row\" ng-hide=\"ports.length == 0\">\n" +
+    "  <!-- Port list panel -->\n" +
+    "  <div ng-hide=\"ports.length==1\" class=\"col-lg-1 col-md-2 col-sm-2 col-xs-2\">\n" +
+    "    <h4>Ports</h4>\n" +
+    "    <ar-list-ports ports=\"ports\" selected=\"selectedPort\" ng-init=\"selectedPort={}\">\n" +
+    "  </div>\n" +
+    "\n" +
+    "  <!-- Selected port(s) detail view -->\n" +
+    "  <div ng-class=\"{'col-lg-11 col-md-10 col-sm-10 col-xs-10' : ports.length > 1, 'col-md-12' : ports.length == 1\">\n" +
+    "  </div>\n" +
+    "</div>\n" +
+    "\n" +
+    "<div class=\"row\" ng-show=\"ports.length == 0\">\n" +
+    "  <div class=\"col-md-12\">\n" +
+    "    No ports\n" +
+    "  </div>\n" +
+    "</div>"
+  );
+
+
+  $templateCache.put('ar-kit/properties/ar-widget-properties.html',
+    "<form role=\"form\" class=\"form-inline\" ng-submit=\"submit()\">\n" +
+    "  <table class=\"table table-hover table-condensed\">\n" +
+    "    <thead>\n" +
+    "      <tr>\n" +
+    "        <th>Name</th>\n" +
+    "        <th>Value</th>\n" +
+    "      </tr>\n" +
+    "    </thead>\n" +
+    "    <tbody ar-widget-property-tbody \n" +
+    "      ng-repeat=\"prop in rhProperties | orderBy: 'name'\"  \n" +
+    "      item=\"prop\"\n" +
+    "      allow-edit=\"allowEdits\">\n" +
+    "    </tbody>\n" +
+    "\n" +
+    "    <tfoot ng-show=\"allowEdits\">\n" +
+    "      <tr>\n" +
+    "        <td></td>\n" +
+    "        <td>\n" +
+    "          <button type=\"submit\" class=\"btn btn-link\">Submit</button>\n" +
+    "        </td>\n" +
+    "      </tr>\n" +
+    "    </tfoot>\n" +
+    "  </table>\n" +
+    "</form>"
+  );
+
+
+  $templateCache.put('ar-kit/properties/ar-widget-property-name-td.html',
+    "<td ng-class=\"{'text-muted': !rhProperty.canEdit}\">\n" +
+    "  <span>\n" +
+    "    {{ rhProperty.name }}\n" +
+    "    <span class=\"label label-default pull-right\">{{ rhProperty.scaType }}</span>\n" +
+    "  </span>\n" +
+    "</td>"
+  );
+
+
+  $templateCache.put('ar-kit/properties/ar-widget-property-simple-seq-tr.html',
+    "\n" +
+    "<tr>\n" +
+    "  <td ar-widget-property-name-td item=\"rhProperty\"></td>\n" +
+    "  <td><button type=\"button\" class=\"btn btn-link\" ng-click=\"isCollapsed = !isCollapsed\">Show</button></td>\n" +
+    "</tr>\n" +
+    "\n" +
+    "<!-- Re-use simple -->\n" +
+    "<ar-widget-property-simple-tr uib-collapse=\"isCollapsed\"\n" +
+    "  ng-repeat=\"item in rhProperty.value track by $index\" \n" +
+    "  item=\"item\"\n" +
+    "  allow-edit=\"(_allowEdit && rhProperty.canEdit)\">\n" +
+    "</ar-widget-property-simple-tr>\n"
+  );
+
+
+  $templateCache.put('ar-kit/properties/ar-widget-property-simple-tr.html',
+    "<tr>\n" +
+    "  <td ar-widget-property-name-td item=\"rhProperty\"></td>\n" +
+    "\n" +
+    "  <!-- Non-editing view -->\n" +
+    "  <td ng-if=\"!rhProperty.canEdit || (rhProperty.canEdit && !allowEdit)\" ng-class=\"{'text-muted': !rhProperty.canEdit}\">\n" +
+    "    <span>{{ rhProperty.value }}</span>\n" +
+    "  </td>\n" +
+    "\n" +
+    "  <!-- Editing view -->\n" +
+    "  <td ng-if=\"rhProperty.canEdit && allowEdit\">\n" +
+    "    <div class=\"form-group\">\n" +
+    "      <!-- Boolean enumeration -->\n" +
+    "      <select ng-if=\"rhProperty.type == 'boolean'\"\n" +
+    "              class=\"form-control\"\n" +
+    "              ng-model=\"rhProperty.value\" \n" +
+    "              ng-options=\"o.value as o.name for o in booleanSelectOptions\">\n" +
+    "      </select>\n" +
+    "\n" +
+    "      <!-- Other enumeration type -->\n" +
+    "      <select ng-if=\"rhProperty.enumerations\" class=\"form-control\" ng-model=\"rhProperty.value\" ng-options=\"value as label for (label, value) in rhProperty.enumerations\"></select>\n" +
+    "\n" +
+    "      <!-- Regular simple -->\n" +
+    "      <input ng-if=\"rhProperty.type != 'boolean' && !rhProperty.enumerations\" type=\"text\" class=\"form-control\" ng-model=\"rhProperty.value\" value=\"{{rhProperty.value}}\"/>\n" +
+    "    </div>\n" +
+    "  </td>\n" +
+    "</tr>"
+  );
+
+
+  $templateCache.put('ar-kit/properties/ar-widget-property-struct-seq-tr.html',
+    "<tr>\n" +
+    "  <td ar-widget-property-name-td item=\"rhProperty\"></td>\n" +
+    "  <td><button type=\"button\" class=\"btn btn-link\" ng-click=\"isCollapsed = !isCollapsed\">Show</button></td>\n" +
+    "</tr>\n" +
+    "\n" +
+    "<!-- Re-use struct if necessary -->\n" +
+    "<ar-widget-property-struct-tr \n" +
+    "  ng-repeat=\"item in rhProperty.value track by $index\" \n" +
+    "  uib-collapse=\"isCollapsed\"\n" +
+    "  item=\"item\"\n" +
+    "  allow-edit=\"(allowEdit && rhProperty.canEdit)\">\n" +
+    "</ar-widget-property-struct-tr>"
+  );
+
+
+  $templateCache.put('ar-kit/properties/ar-widget-property-struct-tr.html',
+    "\n" +
+    "<tr>\n" +
+    "  <td ar-widget-property-name-td item=\"rhProperty\"></td>\n" +
+    "  <td><button type=\"button\" class=\"btn btn-link\" ng-click=\"isCollapsed = !isCollapsed\">Show</button></td>\n" +
+    "</tr>\n" +
+    "\n" +
+    "<!-- Re-use simple or simpleSeq if necessary -->\n" +
+    "<ar-widget-property-simple-tr\n" +
+    "  ng-repeat=\"item in rhProperty.value track by $index\" uib-collapse=\"isCollapsed\"\n" +
+    "  ng-if=\"item.scaType == 'simple'\"\n" +
+    "  item=\"item\"\n" +
+    "  allow-edit=\"(_allowEdit && rhProperty.canEdit)\">\n" +
+    "</ar-widget-property-simple-tr>\n" +
+    "\n" +
+    "<ar-widget-property-simple-seq-tr\n" +
+    "  ng-repeat=\"item in rhProperty.value track by $index\" uib-collapse=\"isCollapsed\"\n" +
+    "  ng-if=\"item.scaType == 'simpleSeq'\"\n" +
+    "  item=\"item\"\n" +
+    "  allow-edit=\"(_allowEdit && rhProperty.canEdit)\">\n" +
+    "</ar-widget-property-simple-seq-tr>"
+  );
+
+
+  $templateCache.put('ar-kit/properties/ar-widget-property-tbody.html',
+    "<!-- Simple -->   \n" +
+    "<ar-widget-property-simple-tr \n" +
+    "  ng-if=\"rhProperty.scaType == 'simple'\" \n" +
+    "  item=\"rhProperty\" allow-edit=\"allowEdit\">\n" +
+    "</ar-widget-property-simple-tr>\n" +
+    "\n" +
+    "<!-- Simple Sequence -->\n" +
+    "<ar-widget-property-simple-seq-tr \n" +
+    "  ng-if=\"rhProperty.scaType == 'simpleSeq'\" \n" +
+    "  item=\"rhProperty\" allow-edit=\"allowEdit\">\n" +
+    "</ar-widget-property-simple-seq-tr>\n" +
+    "\n" +
+    "<!-- Struct -->\n" +
+    "<ar-widget-property-struct-tr \n" +
+    "  ng-if=\"rhProperty.scaType == 'struct'\" \n" +
+    "  item=\"rhProperty\" allow-edit=\"allowEdit\">\n" +
+    "</ar-widget-property-struct-tr>\n" +
+    "\n" +
+    "<!-- Struct Sequence -->\n" +
+    "<ar-widget-property-struct-seq-tr \n" +
+    "  ng-if=\"rhProperty.scaType == 'structSeq'\" \n" +
+    "  item=\"rhProperty\" allow-edit=\"allowEdit\">\n" +
+    "</ar-widget-property-struct-seq-tr>"
   );
 
 }]);

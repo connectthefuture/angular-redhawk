@@ -1,0 +1,39 @@
+<nav class="navbar navbar-fixed-top" 
+     role="navigation" 
+     ng-class="{'navbar-inverse': _invert, 'navbar-default' : !_invert}">
+  <div class="container">
+    <div class="navbar-header">
+      <button type="button" 
+              ng-show="ARSelectedDomain.inst"
+              class="navbar-toggle collapsed" 
+              data-toggle="collapse" 
+              data-target="#navbar-collapse-1">
+        <span class="sr-only">Toggle Menu</span>
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+      </button>
+      <a href="{{ domainsPath }}" class="navbar-brand" ng-class="{'danger-pulse ': !ARSelectedDomain.inst}">
+        <img class="redhawk-nav-icon" src="{{_brandImage}}">
+      </a>
+
+      <!-- The float:left is important for when the navbar collapses to the mobile view.  Without it the text
+           re-aligns to the top of the menu, which looks pretty broken. -->
+      <a class="navbar-brand" href="{{ domainsPath }}/{{ARSelectedDomain.inst.name}}">
+        <span class="glyphicon glyphicon-arrow-left" aria-hidden="true" ng-hide="ARSelectedDomain.inst"></span>
+        <span ng-hide="ARSelectedDomain.inst">Pick a Domain</span>
+        <span ng-show="ARSelectedDomain.inst">{{ ARSelectedDomain.inst.name }}</span>
+      </a>
+    </div>
+
+    <!-- Other navbar selection items -->
+    <!-- Shows only if a domain is selected -->
+    <div ng-show="ARSelectedDomain.inst">
+      <div class="collapse navbar-collapse" id="navbar-collapse-1">
+        <ul class="nav navbar-nav" ng-transclude>
+          <!-- Users's ar-navbar-items will be placed here -->
+        </ul>
+      </div>
+    </div> <!-- ng-show -->
+  </div>
+</nav>

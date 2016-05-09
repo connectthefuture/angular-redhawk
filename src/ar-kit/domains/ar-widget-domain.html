@@ -1,0 +1,16 @@
+<ar-widget title-href="{{domainPath}}"
+    panel-status="selected ? 'panel-primary' : 'panel-default'">
+  <ar-widget-title>{{ domain.name }}</ar-widget-title>
+  <ar-widget-buttons>
+        <button ng-hide="selected" ng-click="setAsSelectedDomain()">
+          <span class="glyphicon glyphicon-ok" aria-label="Set as selected domain"></span>
+        </button>
+  </ar-widget-buttons>
+  <ar-widget-content>
+    <li><span class="badge">{{ domain.eventChannels.length }}</span>Event Channels</li>
+    <li><span class="badge">{{ domain.applications.length }}</span>Applications</li>
+    <li><span class="badge">{{ domain.deviceManagers.length }}</span>Device Managers</li>
+    <li><span class="badge">{{ domain.allocations.length }}</span>Allocations
+    </li>
+  </ar-widget-content>
+</ar-widget>

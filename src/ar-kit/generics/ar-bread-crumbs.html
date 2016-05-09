@@ -1,0 +1,17 @@
+<div class="row">
+  <div class="col-md-12">
+    <ol class="breadcrumb">
+      <!-- Show the grid toggle button if a state variable was passed into the scope -->
+      <li ng-show="gridButtonState != undefined">
+        <button type="button" 
+            class="btn btn-link" 
+            ng-click="gridButtonState = !gridButtonState" 
+            ng-disabled="true == disableGridButton">
+          <span class="glyphicon glyphicon-th"></span>
+        </button>
+      </li>
+      <!-- Repeat all crumbs marking the last as active -->
+      <li ng-repeat="crumb in crumbs" ng-class="{'active':$last}" class="slide">{{ $last ? crumb.name : '' }}<a ng-show="!$last" ng-click="do(crumb.action)">{{ crumb.name }}</a></li>
+    </ol>
+  </div>
+</div>

@@ -1,0 +1,18 @@
+<ar-widget title-href="devicesPath" title-callback="callback()"
+    panel-status="device.started ? 'panel-success' : 'panel-warning'">
+  <ar-widget-title>{{ device.name }}</ar-widget-title>
+  <ar-widget-buttons>
+    <button ng-show="isFEI">
+      <span class="glyphicon glyphicon-signal" title="{{feiKind}}"></span>
+    </button>
+    <button ng-show="device.started" ng-click="stop()">
+      <span class="glyphicon glyphicon-stop" title="Stop"></span>
+    </button>
+    <button ng-hide="device.started" ng-click="start()">
+      <span class="glyphicon glyphicon-play"></span>
+    </button>
+  </ar-widget-buttons>
+  <ar-widget-content>
+    <li><span>TODO: List device kind and device name?</span></li>
+  </ar-widget-content>
+</ar-widget>

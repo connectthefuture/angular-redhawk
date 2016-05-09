@@ -1,0 +1,23 @@
+<!-- Simple -->   
+<ar-widget-property-simple-tr 
+  ng-if="rhProperty.scaType == 'simple'" 
+  item="rhProperty" allow-edit="allowEdit">
+</ar-widget-property-simple-tr>
+
+<!-- Simple Sequence -->
+<ar-widget-property-simple-seq-tr 
+  ng-if="rhProperty.scaType == 'simpleSeq'" 
+  item="rhProperty" allow-edit="allowEdit">
+</ar-widget-property-simple-seq-tr>
+
+<!-- Struct -->
+<ar-widget-property-struct-tr 
+  ng-if="rhProperty.scaType == 'struct'" 
+  item="rhProperty" allow-edit="allowEdit">
+</ar-widget-property-struct-tr>
+
+<!-- Struct Sequence -->
+<ar-widget-property-struct-seq-tr 
+  ng-if="rhProperty.scaType == 'structSeq'" 
+  item="rhProperty" allow-edit="allowEdit">
+</ar-widget-property-struct-seq-tr>

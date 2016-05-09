@@ -1,7 +1,7 @@
 {
-    "title"             : "AngularJS-REDHAWK",
+    "title"             : "Angular-REDHAWK",
     "name"              : "angular-redhawk",
-    "version"           : "0.5.0",
+    "version"           : "1.0.0",
     "description"       : "AngularJS-based library for interacting with rest-python",
     "homepage"          : "http://geontech.github.io/angular-redhawk",
     "repository"        : {
@@ -20,11 +20,12 @@
         "visualization"
     ],
     "bugs"              : {
-        "url": "https://github.com/github/angular-redhawk/issues"
+        "url": "https://github.com/geontech/angular-redhawk/issues"
     },
     "license"           : "GNU LGPL v3",
     "authors"           : [
         "Thomas Goodwin <btgoodwin@geontech.com>",
+        "Patrick Wolfram <pwolfram@geontech.com>",
         "redhawksdr@redhawksdr.org"
     ],
     "devDependencies"   : {
@@ -36,6 +37,7 @@
         "grunt-contrib-concat": "^0.4.0",
         "grunt-contrib-uglify": "^0.4.0",
         "grunt-contrib-clean" : "",
+        "grunt-contrib-copy" : "",
         "grunt-angular-templates": ""
     }
 }
