@@ -65,15 +65,15 @@ arkit.directive('arNavbarItem', function (ARIndicatorService, ARPathConfig) {
   return { 
     restrict : 'E', 
     replace  : true, 
+    transclude : true,
     template : 
       '<li ng-class="{active: isViewLocationActive(route)}" ng-click="clearIndications()"> \
         <a href="{{route}}">\
-          {{title}}\
+          <span ng-transclude>{{title}}</span>\
           <span class="badge">{{ getIndications() }}</span>\
         </a> \
       </li>',
     scope : {
-      title     : "@?",
       route     : "@?",
       arDefault : "@?"
     },
@@ -153,7 +153,7 @@ arkit.directive('arLogoBackground', function () {
     restrict :  'A',
     replace  :  false,
     scope    : {
-      arLogo : '=?'
+      arLogo : '@?arLogoBackground'
     },
     link     : function(scope, element) {
       scope.arLogo = scope.arLogo || arkit.distURL + 'images/redhawk-background.svg';
