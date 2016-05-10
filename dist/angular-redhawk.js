@@ -17,7 +17,7 @@
       * You should have received a copy of the GNU Lesser General Public License                   
       * along with this program.  If not, see http://www.gnu.org/licenses/.                        
       *                                                                                            
-      * angular-redhawk - v1.0.0 - 2016-05-09          
+      * angular-redhawk - v1.0.0 - 2016-05-10          
       */                                                                                           
      var rhModule = angular.module('redhawk', ['redhawk.rest', 'redhawk.util', 'redhawk.sockets', 'redhawk.directives']);
 
@@ -672,7 +672,7 @@ arkit.directive('arDetailDevice', function(ARSelectedDomain, ARPathConfig) {
       deviceManagerId : '=',
     },
     link : function (scope) {
-      scope.$watchGroup(['deviceId', 'deviceManagerId'], function (ids, old) {
+      scope.$watchGroup(['deviceId', 'deviceManagerId'], function (old, ids) {
         var deviceId = ids[0];
         var deviceManagerId = ids[1];
 
@@ -849,15 +849,15 @@ arkit.directive('arNavbarItem', function (ARIndicatorService, ARPathConfig) {
   return { 
     restrict : 'E', 
     replace  : true, 
+    transclude : true,
     template : 
       '<li ng-class="{active: isViewLocationActive(route)}" ng-click="clearIndications()"> \
         <a href="{{route}}">\
-          {{title}}\
+          <span ng-transclude>{{title}}</span>\
           <span class="badge">{{ getIndications() }}</span>\
         </a> \
       </li>',
     scope : {
-      title     : "@?",
       route     : "@?",
       arDefault : "@?"
     },
@@ -937,9 +937,10 @@ arkit.directive('arLogoBackground', function () {
     restrict :  'A',
     replace  :  false,
     scope    : {
-      arLogo : '=?'
+      arLogo : '@?arLogoBackground'
     },
     link     : function(scope, element) {
+      console.log(scope)
       scope.arLogo = scope.arLogo || arkit.distURL + 'images/redhawk-background.svg';
 
       // For some reason this only works a few times in resizing and then quits.
