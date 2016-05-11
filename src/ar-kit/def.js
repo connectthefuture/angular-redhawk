@@ -73,8 +73,8 @@ arkit.provider('ARPathConfig', function() {
   this.setServiceId       = function (v) { serviceId       = v; }
   this.setComponents      = function (v) { components      = v; }
   this.setComponentId     = function (v) { componentId     = v; }
-  this.setAllocations     = function (v) { allocations      = v; }
-  this.setAllocationId    = function (v) { allocationId     = v; }
+  this.setAllocations     = function (v) { allocations     = v; }
+  this.setAllocationId    = function (v) { allocationId    = v; }
 
   // Compiled routes
   this.domain        = function () { return apply(domains, domainId); }
@@ -197,9 +197,30 @@ arkit.constant('ARDefaultViews', {
     }
   });
 
+// Provider related to the ARSelectedDomain service
+// This controls whether or not the ARSelectedDomain service attempts to automatically
+// connect to the first domain it sees (the default).  Usage example:
+// 
+// mymodule.configure(['ARSelectedDomainOptionsProvider', 
+//   function(ARSelectedDomainOptionsProvider) {
+//     ARSelectedDomainOptionsProvider.disableAutoSelect();
+//   }])
+
+arkit.provider('ARSelectedDomainOptions', function() {
+  var autoSelect = true;
+  this.disableAutoSelect = function () { autoSelect = false; }
+  this.enableAutoSelect = function () { autoSelect = true; }
+
+  this.$get = function () {
+    return {
+      autoSelect : autoSelect,
+    }
+  }
+});
+
 // Simple service for holding the presently-selected domain factory instance
-arkit.service('ARSelectedDomain', ['REDHAWK', 
-  function (REDHAWK) {
+arkit.service('ARSelectedDomain', ['REDHAWK', 'ARSelectedDomainOptions',
+  function (REDHAWK, ARSelectedDomainOptions) {
     var self = this;
 
     // Kick off the main listener and expose the list of IDs
@@ -213,6 +234,15 @@ arkit.service('ARSelectedDomain', ['REDHAWK',
         self.inst = REDHAWK.getDomain(id, factory);
       else
         self.inst = null;
+    }
+
+    // If autoSelect is enabled, attach a listener to facilitate
+    if (ARSelectedDomainOptions.autoSelect == true) {
+      REDHAWK.addListener(function (msg) {
+        if (!!msg && msg.domains && 0 < msg.domains.length && null == self.inst) {
+          self.setSelectedDomain(msg.domains[0]);
+        }
+      });
     }
   }]);
 
