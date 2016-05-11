@@ -2846,8 +2846,10 @@ angular.module('redhawk.sockets')
         function connect (path_, callback) {
           path = path_;
           ws = new WebSocket(path);
+          connected = false;
 
           ws.onopen = function (data) {
+            connected = true;
             console.debug("Socket opened: " + path);
             ws.binaryType = "arraybuffer";
             callback.call(ws, data);
@@ -2901,10 +2903,10 @@ angular.module('redhawk.sockets')
          * Send data on the websocket
          */
         function send  (data) {
-          if (undefined == ws) 
-            delayOutQueue.push(data);
-          else 
+          if (!!ws && true == connected) 
             ws.send(data);
+          else
+            delayOutQueue.push(data);
         }
 
         /*
@@ -2917,6 +2919,7 @@ angular.module('redhawk.sockets')
           if (ws) {
             ws.close();
             console.log("Socket closed: " + path);
+            connected = false;
           }
         }
 
@@ -2928,6 +2931,7 @@ angular.module('redhawk.sockets')
         // path - the URL to which this socket is connected.
         var path = undefined;
         var ws = undefined;
+        var connected = false;
         var callbacks = {
           message: [],
           json: [],
