@@ -39,7 +39,8 @@ arkit.controller('ARDomainsController',
 
     // Expose the ARSelectedDomain to the scope
     $scope.ARSelectedDomain = ARSelectedDomain;
-    $scope.$watchGroup(['ARSelectedDomain.inst', 'domain'], function(old, insts) {
+    $scope.selected = false;
+    $scope.$watchGroup(['ARSelectedDomain.inst', 'domain'], function(insts) {
       $scope.selected = insts[0] == insts[1];
     });
   }]);
