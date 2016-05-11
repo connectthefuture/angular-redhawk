@@ -17,7 +17,7 @@
       * You should have received a copy of the GNU Lesser General Public License                   
       * along with this program.  If not, see http://www.gnu.org/licenses/.                        
       *                                                                                            
-      * angular-redhawk - v1.0.0 - 2016-05-10          
+      * angular-redhawk - v1.0.0 - 2016-05-11          
       */                                                                                           
      var rhModule = angular.module('redhawk', ['redhawk.rest', 'redhawk.util', 'redhawk.sockets', 'redhawk.directives']);
 
@@ -709,7 +709,8 @@ arkit.controller('ARDomainsController',
 
     // Expose the ARSelectedDomain to the scope
     $scope.ARSelectedDomain = ARSelectedDomain;
-    $scope.$watchGroup(['ARSelectedDomain.inst', 'domain'], function(old, insts) {
+    $scope.selected = false;
+    $scope.$watchGroup(['ARSelectedDomain.inst', 'domain'], function(insts) {
       $scope.selected = insts[0] == insts[1];
     });
   }]);
@@ -815,28 +816,39 @@ var arkit = angular.module('redhawk.ar-kit');
   service.
  */
 arkit.directive('arNavbar', 
-            ['ARSelectedDomain', 'ARPathConfig', 
-    function (ARSelectedDomain, ARPathConfig) {
+    function (ARSelectedDomain, ARPathConfig, ARTransclusionHelper, $route) {
       return {
         templateUrl:  'ar-kit/generics/ar-navbar.html',
         restrict:     'E',
         replace:      true,
-        transclude:   true,
+        transclude:   {
+          'menu'  : 'arNavbarMenu',
+          'right' : '?arNavbarRight'
+        },
         scope:  {
           brandImage          : '@?', // Defaults to the REDHAWK icon
           invert              : '@?' // Invert navbar color scheme, default false
         },
         // Set defaults
-        link: function(scope) {
+        link: function(scope, element) {
           scope.ARSelectedDomain    = ARSelectedDomain;
-          // One-way binding w/ default value trickery.
-          scope._brandImage         = scope.brandImage || arkit.distURL + 'images/redhawk_icon_150px.png';
+          // One-way binding w/ default value
+          var defaultBrandImage = arkit.distURL + 'images/redhawk_icon_150px.png';
+          scope._brandImage         = scope.brandImage || defaultBrandImage;
           scope._invert             = scope.invert ? scope.invert ===  'true' : false;
 
+          // For the link back to the domain page
           scope.domainsPath = '#' + ARPathConfig.domains;
+
+          // Detect if the domain route is in the user's configuration or not.
+          scope.allowDomainLink = $route.routes.hasOwnProperty(ARPathConfig.domain);
+
+          // Cleanup the transcluded dom
+          ARTransclusionHelper.postTransclude(element, '.menu', 'ar-navbar-menu');
+          ARTransclusionHelper.postTransclude(element, '.right', 'ar-navbar-right');
         }
       }
-  }]);
+  });
 
 /* 
  * Insert these within the arNavbar directive tags to add menu elements
@@ -845,15 +857,15 @@ arkit.directive('arNavbar',
  * views that are included by default with arKit.  Otherwise use title and 
  * route along with the $routeConfig to handle your additional views.
  */
-arkit.directive('arNavbarItem', function (ARIndicatorService, ARPathConfig) { 
+arkit.directive('arNavbarItem', function (ARIndicatorService, ARPathConfig, $route) { 
   return { 
     restrict : 'E', 
     replace  : true, 
     transclude : true,
     template : 
       '<li ng-class="{active: isViewLocationActive(route)}" ng-click="clearIndications()"> \
-        <a href="{{route}}">\
-          <span ng-transclude>{{title}}</span>\
+        <a ng-attr-href="{{routeValid && route || undefined}}">\
+          <ng-transclude><!-- title --></ng-transclude>\
           <span class="badge">{{ getIndications() }}</span>\
         </a> \
       </li>',
@@ -881,6 +893,20 @@ arkit.directive('arNavbarItem', function (ARIndicatorService, ARPathConfig) {
             break;
         }
       }
+
+      scope.$watch('route', function() {
+        scope.routeValid = false;
+        for (var route in $route.routes) {
+          if ($route.routes.hasOwnProperty(route)) {
+            if (route.match('^'+scope.route.replace('#',''))) {
+              scope.routeValid = true;
+              break;
+            }
+          }
+        }
+        if (!scope.routeValid)
+          console.warn('arNavbarItem indicates $routeProvider is not configured for route: ' + scope.route);
+      });
 
       scope.getIndications = function () {
         var value = ARIndicatorService.getIndication(scope.route).value;
@@ -940,7 +966,6 @@ arkit.directive('arLogoBackground', function () {
       arLogo : '@?arLogoBackground'
     },
     link     : function(scope, element) {
-      console.log(scope)
       scope.arLogo = scope.arLogo || arkit.distURL + 'images/redhawk-background.svg';
 
       // For some reason this only works a few times in resizing and then quits.
@@ -4138,13 +4163,15 @@ angular.module('redhawk.ar-kit').run(['$templateCache', function($templateCache)
     "        <span class=\"icon-bar\"></span>\n" +
     "        <span class=\"icon-bar\"></span>\n" +
     "      </button>\n" +
-    "      <a href=\"{{ domainsPath }}\" class=\"navbar-brand\" ng-class=\"{'danger-pulse ': !ARSelectedDomain.inst}\">\n" +
+    "      <a ng-attr-href=\"{{ allowDomainLink && domainsPath || undefined}}\" \n" +
+    "        class=\"navbar-brand\" \n" +
+    "        g-class=\"{'danger-pulse ': !ARSelectedDomain.inst}\">\n" +
     "        <img class=\"redhawk-nav-icon\" src=\"{{_brandImage}}\">\n" +
     "      </a>\n" +
     "\n" +
     "      <!-- The float:left is important for when the navbar collapses to the mobile view.  Without it the text\n" +
     "           re-aligns to the top of the menu, which looks pretty broken. -->\n" +
-    "      <a class=\"navbar-brand\" href=\"{{ domainsPath }}/{{ARSelectedDomain.inst.name}}\">\n" +
+    "      <a ng-show=\"allowDomainLink\" href=\"{{ domainsPath }}/{{ARSelectedDomain.inst.name}}\" class=\"navbar-brand\">\n" +
     "        <span class=\"glyphicon glyphicon-arrow-left\" aria-hidden=\"true\" ng-hide=\"ARSelectedDomain.inst\"></span>\n" +
     "        <span ng-hide=\"ARSelectedDomain.inst\">Pick a Domain</span>\n" +
     "        <span ng-show=\"ARSelectedDomain.inst\">{{ ARSelectedDomain.inst.name }}</span>\n" +
@@ -4155,8 +4182,12 @@ angular.module('redhawk.ar-kit').run(['$templateCache', function($templateCache)
     "    <!-- Shows only if a domain is selected -->\n" +
     "    <div ng-show=\"ARSelectedDomain.inst\">\n" +
     "      <div class=\"collapse navbar-collapse\" id=\"navbar-collapse-1\">\n" +
-    "        <ul class=\"nav navbar-nav\" ng-transclude>\n" +
+    "        <ul class=\"nav navbar-nav menu\" ng-transclude=\"menu\">\n" +
     "          <!-- Users's ar-navbar-items will be placed here -->\n" +
+    "        </ul>\n" +
+    "\n" +
+    "        <ul class=\"nav navbar-nav navbar-right right\" ng-transclude=\"right\">\n" +
+    "          <!-- User's ar-navbar-items for the right side of the menu go here -->\n" +
     "        </ul>\n" +
     "      </div>\n" +
     "    </div> <!-- ng-show -->\n" +
