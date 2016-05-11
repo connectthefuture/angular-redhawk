@@ -31,28 +31,39 @@ var arkit = angular.module('redhawk.ar-kit');
   service.
  */
 arkit.directive('arNavbar', 
-            ['ARSelectedDomain', 'ARPathConfig', 
-    function (ARSelectedDomain, ARPathConfig) {
+    function (ARSelectedDomain, ARPathConfig, ARTransclusionHelper, $route) {
       return {
         templateUrl:  'ar-kit/generics/ar-navbar.html',
         restrict:     'E',
         replace:      true,
-        transclude:   true,
+        transclude:   {
+          'menu'  : 'arNavbarMenu',
+          'right' : '?arNavbarRight'
+        },
         scope:  {
           brandImage          : '@?', // Defaults to the REDHAWK icon
           invert              : '@?' // Invert navbar color scheme, default false
         },
         // Set defaults
-        link: function(scope) {
+        link: function(scope, element) {
           scope.ARSelectedDomain    = ARSelectedDomain;
-          // One-way binding w/ default value trickery.
-          scope._brandImage         = scope.brandImage || arkit.distURL + 'images/redhawk_icon_150px.png';
+          // One-way binding w/ default value
+          var defaultBrandImage = arkit.distURL + 'images/redhawk_icon_150px.png';
+          scope._brandImage         = scope.brandImage || defaultBrandImage;
           scope._invert             = scope.invert ? scope.invert ===  'true' : false;
 
+          // For the link back to the domain page
           scope.domainsPath = '#' + ARPathConfig.domains;
+
+          // Detect if the domain route is in the user's configuration or not.
+          scope.allowDomainLink = $route.routes.hasOwnProperty(ARPathConfig.domain);
+
+          // Cleanup the transcluded dom
+          ARTransclusionHelper.postTransclude(element, '.menu', 'ar-navbar-menu');
+          ARTransclusionHelper.postTransclude(element, '.right', 'ar-navbar-right');
         }
       }
-  }]);
+  });
 
 /* 
  * Insert these within the arNavbar directive tags to add menu elements
@@ -61,15 +72,15 @@ arkit.directive('arNavbar',
  * views that are included by default with arKit.  Otherwise use title and 
  * route along with the $routeConfig to handle your additional views.
  */
-arkit.directive('arNavbarItem', function (ARIndicatorService, ARPathConfig) { 
+arkit.directive('arNavbarItem', function (ARIndicatorService, ARPathConfig, $route) { 
   return { 
     restrict : 'E', 
     replace  : true, 
     transclude : true,
     template : 
       '<li ng-class="{active: isViewLocationActive(route)}" ng-click="clearIndications()"> \
-        <a href="{{route}}">\
-          <span ng-transclude>{{title}}</span>\
+        <a ng-attr-href="{{routeValid && route || undefined}}">\
+          <ng-transclude><!-- title --></ng-transclude>\
           <span class="badge">{{ getIndications() }}</span>\
         </a> \
       </li>',
@@ -97,6 +108,20 @@ arkit.directive('arNavbarItem', function (ARIndicatorService, ARPathConfig) {
             break;
         }
       }
+
+      scope.$watch('route', function() {
+        scope.routeValid = false;
+        for (var route in $route.routes) {
+          if ($route.routes.hasOwnProperty(route)) {
+            if (route.match('^'+scope.route.replace('#',''))) {
+              scope.routeValid = true;
+              break;
+            }
+          }
+        }
+        if (!scope.routeValid)
+          console.warn('arNavbarItem indicates $routeProvider is not configured for route: ' + scope.route);
+      });
 
       scope.getIndications = function () {
         var value = ARIndicatorService.getIndication(scope.route).value;

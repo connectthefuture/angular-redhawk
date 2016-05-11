@@ -13,13 +13,15 @@
         <span class="icon-bar"></span>
         <span class="icon-bar"></span>
       </button>
-      <a href="{{ domainsPath }}" class="navbar-brand" ng-class="{'danger-pulse ': !ARSelectedDomain.inst}">
+      <a ng-attr-href="{{ allowDomainLink && domainsPath || undefined}}" 
+        class="navbar-brand" 
+        g-class="{'danger-pulse ': !ARSelectedDomain.inst}">
         <img class="redhawk-nav-icon" src="{{_brandImage}}">
       </a>
 
       <!-- The float:left is important for when the navbar collapses to the mobile view.  Without it the text
            re-aligns to the top of the menu, which looks pretty broken. -->
-      <a class="navbar-brand" href="{{ domainsPath }}/{{ARSelectedDomain.inst.name}}">
+      <a ng-show="allowDomainLink" href="{{ domainsPath }}/{{ARSelectedDomain.inst.name}}" class="navbar-brand">
         <span class="glyphicon glyphicon-arrow-left" aria-hidden="true" ng-hide="ARSelectedDomain.inst"></span>
         <span ng-hide="ARSelectedDomain.inst">Pick a Domain</span>
         <span ng-show="ARSelectedDomain.inst">{{ ARSelectedDomain.inst.name }}</span>
@@ -30,8 +32,12 @@
     <!-- Shows only if a domain is selected -->
     <div ng-show="ARSelectedDomain.inst">
       <div class="collapse navbar-collapse" id="navbar-collapse-1">
-        <ul class="nav navbar-nav" ng-transclude>
+        <ul class="nav navbar-nav menu" ng-transclude="menu">
           <!-- Users's ar-navbar-items will be placed here -->
+        </ul>
+
+        <ul class="nav navbar-nav navbar-right right" ng-transclude="right">
+          <!-- User's ar-navbar-items for the right side of the menu go here -->
         </ul>
       </div>
     </div> <!-- ng-show -->
